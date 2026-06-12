@@ -53,6 +53,8 @@ const SMACK_WINDOW = 2 // smacks only score in the seconds after a real jump lan
 /** Pure scoring logic — no DOM, deterministic via the injected RNG. */
 export class ScoreState {
   total = 0
+  /** Highest single bonus ever seen — seed from storage, persisted by the caller. */
+  bestBonus: Bonus | null = null
   tuning: ScoreTuning = { ...defaultScoreTuning }
   /** Audio hook: subscribe when sound assets land. */
   onBonus?: (bonus: Bonus) => void
@@ -156,6 +158,9 @@ export class ScoreState {
 
     this.total += points
     this.queue.push(bonus)
+    if (this.bestBonus === null || points > this.bestBonus.points) {
+      this.bestBonus = bonus
+    }
     this.onBonus?.(bonus)
   }
 }
@@ -165,6 +170,7 @@ const POPUP_POOL_SIZE = 8
 /** DOM presentation: retro counter top-left + pooled floating popups. */
 export class ScoreOverlay {
   private readonly counter: HTMLDivElement
+  private readonly best: HTMLDivElement
   private readonly popups: HTMLDivElement[] = []
   private nextPopup = 0
 
@@ -176,6 +182,12 @@ export class ScoreOverlay {
       'text-shadow:0 2px 0 rgba(0,0,0,.45);z-index:10;pointer-events:none;'
     this.counter.textContent = '0'
     parent.appendChild(this.counter)
+
+    this.best = document.createElement('div')
+    this.best.style.cssText =
+      'position:fixed;top:46px;left:18px;font:700 13px/1 ui-monospace,monospace;color:#ffd54f;' +
+      'text-shadow:0 1px 0 rgba(0,0,0,.5);z-index:10;pointer-events:none;letter-spacing:1px;'
+    parent.appendChild(this.best)
 
     for (let i = 0; i < POPUP_POOL_SIZE; i++) {
       const el = document.createElement('div')
@@ -190,6 +202,10 @@ export class ScoreOverlay {
 
   setTotal(total: number) {
     this.counter.textContent = String(total)
+  }
+
+  setBest(bonus: Bonus | null) {
+    this.best.textContent = bonus ? `BEST: ${bonus.name} +${bonus.points}` : ''
   }
 
   popup(text: string, x: number, y: number, big: boolean) {

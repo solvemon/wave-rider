@@ -55,6 +55,15 @@ const ragdoll = new Ragdoll()
 scene.add(ragdoll.group)
 
 const score = new ScoreState()
+const BEST_BONUS_KEY = 'waverider-best-bonus'
+try {
+  const stored = localStorage.getItem(BEST_BONUS_KEY)
+  if (stored !== null) {
+    score.bestBonus = JSON.parse(stored)
+  }
+} catch {
+  // private-mode/quota quirks — best-bonus persistence is a nicety, not a need
+}
 
 window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyR') {
@@ -181,6 +190,13 @@ function frame(now: number) {
     if (bonus.big) {
       nitro.addBonus(bonus.points)
     }
+    if (bonus === score.bestBonus) {
+      try {
+        localStorage.setItem(BEST_BONUS_KEY, JSON.stringify(bonus))
+      } catch {
+        // ignore storage failures
+      }
+    }
     if (bonus.kind === 'snorkel') {
       popupWorld.copy(ragdoll.headPos)
     } else if (bonus.kind === 'airtime' || bonus.kind === 'barrelRoll') {
@@ -198,6 +214,7 @@ function frame(now: number) {
     )
   }
   overlay.setTotal(score.total)
+  overlay.setBest(score.bestBonus)
 
   requestAnimationFrame(frame)
 }

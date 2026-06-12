@@ -92,6 +92,18 @@ describe('ScoreState', () => {
     expect(score.drain()).toHaveLength(1)
   })
 
+  it('tracks the highest single bonus ever seen', () => {
+    const score = new ScoreState(() => 0)
+    score.barrelRoll() // 200
+    score.barrelRoll() // 300
+    score.landed()
+    score.barrelRoll() // 200 again — must not displace the 300
+    expect(score.bestBonus?.points).toBe(300)
+    score.bestBonus = { kind: 'megaSmack', name: 'MEGA BONK', points: 999, big: true } // seeded from storage
+    score.barrelRoll()
+    expect(score.bestBonus.points).toBe(999)
+  })
+
   it('escalates barrel roll points within one flight and resets on landing', () => {
     const score = new ScoreState(() => 0)
     score.barrelRoll()
