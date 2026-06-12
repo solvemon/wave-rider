@@ -41,6 +41,16 @@ describe('Ragdoll', () => {
     expect(foot.pos.y).toBeGreaterThan(-5)
   })
 
+  it('reports a deck impact when slammed into the hull', () => {
+    const { vessel, doll } = makeDoll()
+    for (const p of doll.particles) {
+      p.prev.y = p.pos.y + 0.2 // implied downward velocity of 12 m/s
+    }
+    doll.update(STEP, vessel, flatWater)
+    expect(doll.deckImpact).not.toBeNull()
+    expect(doll.deckImpact!.force).toBeGreaterThan(5)
+  })
+
   it('stays finite through violent vessel motion', () => {
     const { vessel, doll } = makeDoll()
     for (let i = 0; i < 600; i++) {

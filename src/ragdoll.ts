@@ -112,6 +112,9 @@ export class Ragdoll {
   readonly group = new THREE.Group()
   tuning: RagdollTuning = { ...defaultRagdollTuning }
   readonly particles: RagdollParticle[] = []
+  /** Strongest deck hit this step (force in m/s into the deck), or null. */
+  deckImpact: { force: number; head: boolean; point: THREE.Vector3 } | null = null
+  private readonly impactPoint = new THREE.Vector3()
   private readonly limbMeshes: { mesh: THREE.Mesh; a: number; b: number }[] = []
   private readonly torsoMesh: THREE.Mesh
   private readonly headMesh: THREE.Mesh
@@ -155,6 +158,10 @@ export class Ragdoll {
     this.group.add(this.headMesh)
   }
 
+  get headPos(): THREE.Vector3 {
+    return this.particles[HEAD].pos
+  }
+
   /** Worst relative constraint-length error — exposed for tests. */
   maxConstraintError(): number {
 
@@ -185,6 +192,7 @@ export class Ragdoll {
   update(dt: number, vessel: Vessel, sampleHeight: SurfaceSampler, splash?: Splash) {
 
     const t = this.tuning
+    this.deckImpact = null
     this.computeMounts(vessel)
     this.splashCooldown = Math.max(0, this.splashCooldown - dt)
 
@@ -234,6 +242,12 @@ export class Ragdoll {
       this.tmp.copy(p.pos).sub(vessel.position).applyQuaternion(this.invOrientation)
       const onFootprint = Math.abs(this.tmp.x) < DECK_HALF_WIDTH && Math.abs(this.tmp.z) < DECK_HALF_LENGTH
       if (onFootprint && this.tmp.y < DECK_Y && this.tmp.y > DECK_Y - DECK_SNAP_RANGE) {
+        // closing speed of the particle onto the (possibly moving) deck
+        const closing = (p.prev.y - p.pos.y) / dt + vessel.vy
+        if (closing > 0 && (this.deckImpact === null || closing > this.deckImpact.force)) {
+          this.impactPoint.copy(p.pos)
+          this.deckImpact = { force: closing, head: i === HEAD, point: this.impactPoint }
+        }
         this.tmp.y = DECK_Y
         p.pos.copy(this.tmp.applyQuaternion(this.orientation).add(vessel.position))
         const friction = Math.min(DECK_FRICTION * dt, 1)
