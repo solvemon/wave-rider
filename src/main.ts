@@ -3,6 +3,7 @@ import { defaultWaves, surfaceHeight } from './waves'
 import { Ocean } from './ocean'
 import { Vessel, KeyboardInput, createVesselMesh, syncVesselMesh } from './vessel'
 import { ChaseCamera } from './camera'
+import { createTuningPanel } from './tuning'
 
 const STEP = 1 / 60
 
@@ -32,6 +33,13 @@ scene.add(vesselMesh)
 const chase = new ChaseCamera(camera)
 const input = new KeyboardInput()
 input.attach()
+
+createTuningPanel({
+  waves,
+  onWavesChanged: () => ocean.updateWaves(waves),
+  vessel: vessel.tuning,
+  camera: chase.tuning,
+})
 
 let simTime = 0
 const sampler = (x: number, z: number) => surfaceHeight(waves, x, z, simTime)
