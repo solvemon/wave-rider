@@ -25,7 +25,7 @@ type-checks and bundles.
 
 ## Playtesting — what to look for
 
-Chase the two big swells (they travel roughly north/north-east), drive up
+Chase the two big swells (they travel to your right at spawn), drive up
 the back of one at full throttle, and jump it. Then open the tuning panel
 (H) and twiddle. The prototype's core unknown is whether **jumpable** waves
 and a **chill** vibe coexist — try to find a parameter set that gives both,

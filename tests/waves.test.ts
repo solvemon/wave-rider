@@ -16,6 +16,23 @@ describe('gerstnerDisplace', () => {
     }
   })
 
+  it('matches pinned golden values (guards against silent divergence from the GLSL twin)', () => {
+    // Captured from the reviewed implementation. A self-consistent change to
+    // the TS math (flipped phase sign, altered q normalization) passes every
+    // other test while silently diverging from the GLSL shader — this fixture
+    // is the only automated anchor for that equivalence.
+    const cases = [
+      { x: 10, z: 5, t: 2.5, expected: { x: 1.0174285483090622, y: -1.871102781656779, z: 0.3771377616548723 } },
+      { x: -30.7, z: 18.2, t: 12.0, expected: { x: 2.210556020926044, y: -0.5966475035523656, z: 0.06013797818321232 } },
+    ]
+    for (const { x, z, t, expected } of cases) {
+      const out = gerstnerDisplace(defaultWaves, x, z, t, { x: 0, y: 0, z: 0 })
+      expect(out.x).toBeCloseTo(expected.x, 10)
+      expect(out.y).toBeCloseTo(expected.y, 10)
+      expect(out.z).toBeCloseTo(expected.z, 10)
+    }
+  })
+
   it('produces no horizontal displacement at zero steepness', () => {
     const flat = defaultWaves.map((w) => ({ ...w, steepness: 0 }))
     const out = gerstnerDisplace(flat, 12.3, -7.8, 4.2, { x: 0, y: 0, z: 0 })

@@ -77,8 +77,10 @@ export class Vessel {
     const waterline = (hBow + hStern + hPort + hStarboard) / 4
     const submersion = waterline - this.position.y
     const wasAirborne = this.airborne
-    // Hysteresis keeps chop from flickering the airborne state, which would
-    // bleed speed through repeated micro-landings.
+    // Airborne is judged on the AVERAGE of the 4 hull heights (a deliberate
+    // simplification of the spec's "all points clear" — smoother on steep
+    // crests). Hysteresis keeps chop from flickering the airborne state,
+    // which would bleed speed through repeated micro-landings.
     this.airborne = submersion < (wasAirborne ? AIRBORNE_CLEAR : AIRBORNE_THRESHOLD)
 
     if (this.airborne) {
