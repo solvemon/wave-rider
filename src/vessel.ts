@@ -4,6 +4,7 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 export interface VesselInput {
   throttle: number // -1..1, W = +1
   steer: number // -1..1, D = +1 (right)
+  boost?: boolean // nitro — gated by charge in main, vessel just applies thrust
 }
 
 export type SurfaceSampler = (x: number, z: number) => number
@@ -15,6 +16,7 @@ export interface VesselTuning {
   buoyancyDamping: number
   thrust: number
   reverseThrust: number
+  boostThrust: number // extra keel acceleration while nitro is burning
   waterDrag: number
   planingLift: number // upward accel per m/s of forward speed — speed lifts the hull out of the water
   lateralGrip: number // how fast sideways slip bleeds off (1/s) — lower = driftier carves
@@ -37,6 +39,7 @@ export const defaultTuning: VesselTuning = {
   buoyancyDamping: 8,
   thrust: 25,
   reverseThrust: 6,
+  boostThrust: 30,
   waterDrag: 0.5,
   planingLift: 0.5,
   lateralGrip: 2.5,
@@ -127,7 +130,8 @@ export class Vessel {
       let forwardSpeed = this.vx * sinYaw + this.vz * cosYaw
       let lateralSpeed = this.vx * cosYaw - this.vz * sinYaw
       const throttleAccel = input.throttle >= 0 ? input.throttle * t.thrust : input.throttle * t.reverseThrust
-      forwardSpeed += (throttleAccel - t.waterDrag * forwardSpeed) * dt
+      const boostAccel = input.boost ? t.boostThrust : 0
+      forwardSpeed += (throttleAccel + boostAccel - t.waterDrag * forwardSpeed) * dt
       lateralSpeed *= Math.max(0, 1 - t.lateralGrip * dt)
       this.vx = forwardSpeed * sinYaw + lateralSpeed * cosYaw
       this.vz = forwardSpeed * cosYaw - lateralSpeed * sinYaw
@@ -235,11 +239,14 @@ export function syncVesselMesh(vessel: Vessel, mesh: THREE.Object3D) {
 }
 
 export class KeyboardInput {
-  readonly state: VesselInput = { throttle: 0, steer: 0 }
+  readonly state: VesselInput = { throttle: 0, steer: 0, boost: false }
   private readonly pressed = new Set<string>()
 
   attach() {
     window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault() // keep the page from scrolling
+      }
       this.pressed.add(e.code)
       this.refresh()
     })
@@ -257,5 +264,6 @@ export class KeyboardInput {
       (p.has('KeyW') || p.has('ArrowUp') ? 1 : 0) - (p.has('KeyS') || p.has('ArrowDown') ? 1 : 0)
     this.state.steer =
       (p.has('KeyD') || p.has('ArrowRight') ? 1 : 0) - (p.has('KeyA') || p.has('ArrowLeft') ? 1 : 0)
+    this.state.boost = p.has('Space')
   }
 }

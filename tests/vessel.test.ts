@@ -103,6 +103,16 @@ describe('Vessel', () => {
     expect(firstImpact).toBeGreaterThan(3) // ~4 m fall at airGravity 11 → ≈9 m/s
   })
 
+  it('boosts to a higher speed than throttle alone', () => {
+    const plain = new Vessel()
+    plain.position.y = -0.3
+    run(plain, 3, { throttle: 1, steer: 0 })
+    const boosted = new Vessel()
+    boosted.position.y = -0.3
+    run(boosted, 3, { throttle: 1, steer: 0, boost: true })
+    expect(boosted.speed).toBeGreaterThan(plain.speed + 5)
+  })
+
   it('planes: rides higher in the water with speed', () => {
     const vessel = new Vessel()
     vessel.position.y = -0.3
