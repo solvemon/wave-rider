@@ -21,7 +21,7 @@ physics engine (11 particles do not justify a dependency).
 
 ### 3.1 `src/ragdoll.ts` (new)
 
-**Particles (11):** hands L/R (pinned), elbows L/R, shoulders L/R, head,
+**Particles (12):** hands L/R (pinned), elbows L/R, shoulders L/R, head,
 pelvis, knees L/R, feet L/R. Each particle: position + previous position
 (velocity is implicit).
 

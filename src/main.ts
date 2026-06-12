@@ -6,6 +6,7 @@ import { ChaseCamera } from './camera'
 import { Sky } from './sky'
 import { Wake } from './wake'
 import { Splash } from './splash'
+import { Ragdoll } from './ragdoll'
 import { createTuningPanel } from './tuning'
 
 const STEP = 1 / 60
@@ -48,6 +49,15 @@ scene.add(wake.mesh)
 const splash = new Splash()
 scene.add(splash.points)
 
+const ragdoll = new Ragdoll()
+scene.add(ragdoll.group)
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyR') {
+    ragdoll.reset(vessel)
+  }
+})
+
 const chase = new ChaseCamera(camera)
 const input = new KeyboardInput()
 input.attach()
@@ -63,7 +73,10 @@ createTuningPanel({
   oceanRipple: ocean.ripple,
   wake: wake.tuning,
   splash: splash.tuning,
+  ragdoll: ragdoll.tuning,
 })
+
+ragdoll.reset(vessel)
 
 let simTime = 0
 const sampler = (x: number, z: number) => surfaceHeight(waves, x, z, simTime)
@@ -90,6 +103,7 @@ function frame(now: number) {
   while (accumulator >= STEP) {
     simTime += STEP
     vessel.update(STEP, input.state, sampler)
+    ragdoll.update(STEP, vessel, sampler, splash)
     pendingLanding = Math.max(pendingLanding, vessel.justLanded)
     pendingTakeoff = pendingTakeoff || vessel.justTookOff
     accumulator -= STEP

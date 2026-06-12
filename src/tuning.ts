@@ -4,6 +4,7 @@ import type { VesselTuning } from './vessel'
 import type { CameraTuning } from './camera'
 import type { WakeTuning } from './wake'
 import type { SplashTuning } from './splash'
+import type { RagdollTuning } from './ragdoll'
 
 export interface TuningTargets {
   waves: WaveParams[]
@@ -16,6 +17,7 @@ export interface TuningTargets {
   oceanRipple: { strength: number }
   wake: WakeTuning
   splash: SplashTuning
+  ragdoll: RagdollTuning
 }
 
 /** Builds the live tuning panel. Press H to show/hide. */
@@ -80,6 +82,11 @@ export function createTuningPanel(targets: TuningTargets): GUI {
   visuals.add(targets.wake, 'lifetime', 0.5, 6, 0.1).name('wakeLifetime')
   visuals.add(targets.splash, 'sprayRate', 0, 3, 0.05)
   visuals.add(targets.splash, 'splashIntensity', 0, 3, 0.05)
+
+  const rag = gui.addFolder('Ragdoll')
+  rag.add(targets.ragdoll, 'gravity', 4, 30, 0.5)
+  rag.add(targets.ragdoll, 'damping', 0.9, 0.999, 0.001)
+  rag.add(targets.ragdoll, 'waterDrag', 0, 15, 0.25)
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyH') {
