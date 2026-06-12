@@ -185,7 +185,7 @@ export function createVesselMesh(): THREE.Group {
 // Purely cosmetic lift so the hull reads as planing instead of burying in
 // steep wave faces (physics rides ~0.6 m below the local surface in big
 // swells). Does not affect any physics sampling.
-const VISUAL_FLOAT_OFFSET = 0.25
+export const VISUAL_FLOAT_OFFSET = 0.25
 
 export function syncVesselMesh(vessel: Vessel, mesh: THREE.Object3D) {
 

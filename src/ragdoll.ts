@@ -1,0 +1,258 @@
+import * as THREE from 'three'
+import { VISUAL_FLOAT_OFFSET } from './vessel'
+import type { Vessel, SurfaceSampler } from './vessel'
+import type { Splash } from './splash'
+
+// particle indices
+const HAND_L = 0
+const HAND_R = 1
+const ELBOW_L = 2
+const ELBOW_R = 3
+const SHOULDER_L = 4
+const SHOULDER_R = 5
+const HEAD = 6
+const PELVIS = 7
+const KNEE_L = 8
+const KNEE_R = 9
+const FOOT_L = 10
+const FOOT_R = 11
+const PARTICLE_COUNT = 12
+
+const ITERATIONS = 4
+const MAX_STEP_MOVE = 3 // metres per step — NaN backstop on violent landings
+const SPLASH_MIN_IMPACT = 3
+const SPLASH_INTERVAL = 0.125 // ≤ 8 bursts/s so the doll can't drain the pool
+const MOUNT_L = new THREE.Vector3(-0.35, 0.5 + VISUAL_FLOAT_OFFSET, 1.5)
+const MOUNT_R = new THREE.Vector3(0.35, 0.5 + VISUAL_FLOAT_OFFSET, 1.5)
+const UP = new THREE.Vector3(0, 1, 0)
+
+export interface RagdollTuning {
+  gravity: number
+  damping: number
+  waterDrag: number
+}
+
+export const defaultRagdollTuning: RagdollTuning = { gravity: 14, damping: 0.985, waterDrag: 6 }
+
+export interface RagdollParticle {
+  pos: THREE.Vector3
+  prev: THREE.Vector3
+}
+
+interface Constraint {
+  a: number
+  b: number
+  rest: number
+}
+
+// (a, b, rest length) — ~1.7 m figure
+const CONSTRAINTS: Constraint[] = [
+  { a: HAND_L, b: ELBOW_L, rest: 0.28 },
+  { a: HAND_R, b: ELBOW_R, rest: 0.28 },
+  { a: ELBOW_L, b: SHOULDER_L, rest: 0.3 },
+  { a: ELBOW_R, b: SHOULDER_R, rest: 0.3 },
+  { a: SHOULDER_L, b: SHOULDER_R, rest: 0.36 },
+  { a: SHOULDER_L, b: HEAD, rest: 0.28 },
+  { a: SHOULDER_R, b: HEAD, rest: 0.28 },
+  { a: SHOULDER_L, b: PELVIS, rest: 0.55 },
+  { a: SHOULDER_R, b: PELVIS, rest: 0.55 },
+  { a: HEAD, b: PELVIS, rest: 0.75 }, // anti-fold brace
+  { a: PELVIS, b: KNEE_L, rest: 0.42 },
+  { a: PELVIS, b: KNEE_R, rest: 0.42 },
+  { a: KNEE_L, b: FOOT_L, rest: 0.4 },
+  { a: KNEE_R, b: FOOT_R, rest: 0.4 },
+]
+
+// resting pose offsets in vessel-local space (hands land on the mounts)
+const POSE: [number, number, number][] = [
+  [-0.35, 0.5, 1.5],
+  [0.35, 0.5, 1.5],
+  [-0.3, 0.45, 1.25],
+  [0.3, 0.45, 1.25],
+  [-0.18, 0.5, 1.0],
+  [0.18, 0.5, 1.0],
+  [0, 0.65, 0.85],
+  [0, 0.45, 0.45],
+  [-0.12, 0.4, 0.05],
+  [0.12, 0.4, 0.05],
+  [-0.14, 0.35, -0.35],
+  [0.14, 0.35, -0.35],
+]
+
+const LIMB_BONES: [number, number][] = [
+  [HAND_L, ELBOW_L],
+  [HAND_R, ELBOW_R],
+  [ELBOW_L, SHOULDER_L],
+  [ELBOW_R, SHOULDER_R],
+  [PELVIS, KNEE_L],
+  [PELVIS, KNEE_R],
+  [KNEE_L, FOOT_L],
+  [KNEE_R, FOOT_R],
+]
+
+/**
+ * Verlet ragdoll pinned by the hands to the front deck. Position-based:
+ * integrate, relax distance constraints, re-pin hands each iteration —
+ * stable by construction, no spring stiffness to explode. One-way coupling:
+ * the vessel moves the doll, never the reverse.
+ */
+export class Ragdoll {
+  readonly group = new THREE.Group()
+  tuning: RagdollTuning = { ...defaultRagdollTuning }
+  readonly particles: RagdollParticle[] = []
+  private readonly limbMeshes: { mesh: THREE.Mesh; a: number; b: number }[] = []
+  private readonly torsoMesh: THREE.Mesh
+  private readonly headMesh: THREE.Mesh
+  private readonly mountL = new THREE.Vector3()
+  private readonly mountR = new THREE.Vector3()
+  private readonly orientation = new THREE.Quaternion()
+  private readonly euler = new THREE.Euler(0, 0, 0, 'YXZ')
+  private readonly tmp = new THREE.Vector3()
+  private readonly shoulderMid = new THREE.Vector3() // placeBone reuses tmp — keep these distinct
+  private splashCooldown = 0
+
+  constructor() {
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      this.particles.push({ pos: new THREE.Vector3(), prev: new THREE.Vector3() })
+    }
+
+    const wetsuit = new THREE.MeshStandardMaterial({ color: 0xffd54f })
+    for (const [a, b] of LIMB_BONES) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.11, 1, 0.11), wetsuit)
+      this.limbMeshes.push({ mesh, a, b })
+      this.group.add(mesh)
+    }
+
+    this.torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1, 0.18), wetsuit)
+    this.group.add(this.torsoMesh)
+
+    this.headMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.22, 0.22),
+      new THREE.MeshStandardMaterial({ color: 0xfafafa }),
+    )
+    this.group.add(this.headMesh)
+  }
+
+  /** Worst relative constraint-length error — exposed for tests. */
+  maxConstraintError(): number {
+
+    let worst = 0
+    for (const c of CONSTRAINTS) {
+      const dist = this.particles[c.a].pos.distanceTo(this.particles[c.b].pos)
+      worst = Math.max(worst, Math.abs(dist - c.rest) / c.rest)
+    }
+
+    return worst
+  }
+
+  /** Snap the doll into its deck pose with zero velocity. */
+  reset(vessel: Vessel) {
+
+    this.computeMounts(vessel)
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const p = this.particles[i]
+      this.tmp.set(POSE[i][0], POSE[i][1] + VISUAL_FLOAT_OFFSET, POSE[i][2])
+        .applyQuaternion(this.orientation)
+        .add(vessel.position)
+      p.pos.copy(this.tmp)
+      p.prev.copy(this.tmp)
+    }
+    this.syncMeshes()
+  }
+
+  update(dt: number, vessel: Vessel, sampleHeight: SurfaceSampler, splash?: Splash) {
+
+    const t = this.tuning
+    this.computeMounts(vessel)
+    this.splashCooldown = Math.max(0, this.splashCooldown - dt)
+
+    for (const p of this.particles) {
+      const vx = (p.pos.x - p.prev.x) * t.damping
+      const vy = (p.pos.y - p.prev.y) * t.damping
+      const vz = (p.pos.z - p.prev.z) * t.damping
+      const move = Math.hypot(vx, vy, vz)
+      const scale = move > MAX_STEP_MOVE ? MAX_STEP_MOVE / move : 1
+      p.prev.copy(p.pos)
+      p.pos.x += vx * scale
+      p.pos.y += vy * scale - t.gravity * dt * dt
+      p.pos.z += vz * scale
+    }
+
+    for (let iter = 0; iter < ITERATIONS; iter++) {
+      this.particles[HAND_L].pos.copy(this.mountL)
+      this.particles[HAND_R].pos.copy(this.mountR)
+      for (const c of CONSTRAINTS) {
+        const pa = this.particles[c.a].pos
+        const pb = this.particles[c.b].pos
+        let dx = pb.x - pa.x
+        let dy = pb.y - pa.y
+        let dz = pb.z - pa.z
+        const dist = Math.hypot(dx, dy, dz) || 1e-6
+        const push = ((dist - c.rest) / dist) * 0.5
+        dx *= push
+        dy *= push
+        dz *= push
+        pa.x += dx
+        pa.y += dy
+        pa.z += dz
+        pb.x -= dx
+        pb.y -= dy
+        pb.z -= dz
+      }
+    }
+    this.particles[HAND_L].pos.copy(this.mountL)
+    this.particles[HAND_R].pos.copy(this.mountR)
+
+    // skip & drag: submerged parts get pushed up and slowed sideways
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      if (i === HAND_L || i === HAND_R) {
+        continue
+      }
+      const p = this.particles[i]
+      const surface = sampleHeight(p.pos.x, p.pos.z)
+      if (p.pos.y < surface) {
+        const impact = (p.prev.y - p.pos.y) / dt
+        p.pos.y += (surface - p.pos.y) * 0.6
+        const drag = Math.min(t.waterDrag * dt, 1)
+        p.prev.x += (p.pos.x - p.prev.x) * drag
+        p.prev.z += (p.pos.z - p.prev.z) * drag
+        if (splash && impact > SPLASH_MIN_IMPACT && this.splashCooldown <= 0) {
+          this.splashCooldown = SPLASH_INTERVAL
+          splash.burst(p.pos, 6, Math.min(impact * 0.4, 4))
+        }
+      }
+    }
+
+    this.syncMeshes()
+  }
+
+  private computeMounts(vessel: Vessel) {
+
+    this.euler.set(-vessel.pitch, vessel.yaw, -vessel.roll)
+    this.orientation.setFromEuler(this.euler)
+    this.mountL.copy(MOUNT_L).applyQuaternion(this.orientation).add(vessel.position)
+    this.mountR.copy(MOUNT_R).applyQuaternion(this.orientation).add(vessel.position)
+  }
+
+  private syncMeshes() {
+
+    for (const { mesh, a, b } of this.limbMeshes) {
+      this.placeBone(mesh, this.particles[a].pos, this.particles[b].pos)
+    }
+
+    this.shoulderMid.copy(this.particles[SHOULDER_L].pos).add(this.particles[SHOULDER_R].pos).multiplyScalar(0.5)
+    this.placeBone(this.torsoMesh, this.shoulderMid, this.particles[PELVIS].pos)
+
+    this.headMesh.position.copy(this.particles[HEAD].pos)
+  }
+
+  private placeBone(mesh: THREE.Mesh, a: THREE.Vector3, b: THREE.Vector3) {
+
+    mesh.position.copy(a).add(b).multiplyScalar(0.5)
+    this.tmp.copy(b).sub(a)
+    const len = Math.max(this.tmp.length(), 0.001)
+    mesh.scale.y = len
+    mesh.quaternion.setFromUnitVectors(UP, this.tmp.divideScalar(len))
+  }
+}
