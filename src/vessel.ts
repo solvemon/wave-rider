@@ -53,7 +53,7 @@ export const defaultTuning: VesselTuning = {
   autoLevelSpring: 8,
   autoLevelDamping: 4,
   airPitchAuthority: 0.35,
-  rollRate: 4.5,
+  rollRate: 6.5,
   landingAbsorb: 0.6,
   speedKeptOnLanding: 0.85,
 }
@@ -139,6 +139,11 @@ export class Vessel {
     } else {
       if (wasAirborne) {
         this.justLanded = Math.max(0, -this.vy)
+        // arcade leniency: a roll ≥80% complete at touchdown counts — the
+        // landing itself visually finishes the rotation via the orient spring
+        if (Math.abs(this.airRollAccum) >= Math.PI * 2 * 0.8) {
+          this.justBarrelRolled = true
+        }
         this.airRollAccum = 0
         // recover from any partial roll the short way
         this.roll = Math.atan2(Math.sin(this.roll), Math.cos(this.roll))
@@ -291,6 +296,6 @@ export class KeyboardInput {
     this.state.steer =
       (p.has('KeyD') || p.has('ArrowRight') ? 1 : 0) - (p.has('KeyA') || p.has('ArrowLeft') ? 1 : 0)
     this.state.boost = p.has('Space')
-    this.state.roll = (p.has('KeyE') ? 1 : 0) - (p.has('KeyQ') ? 1 : 0)
+    this.state.roll = (p.has('KeyQ') ? 1 : 0) - (p.has('KeyE') ? 1 : 0)
   }
 }

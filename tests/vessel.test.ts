@@ -136,6 +136,26 @@ describe('Vessel', () => {
     expect(Math.abs(vessel.roll)).toBeLessThan(Math.PI * 2)
   })
 
+  it('credits a nearly-complete roll on touchdown', () => {
+    const vessel = new Vessel()
+    vessel.tuning.rollRate = 4.5
+    // falling toward water at -9: touchdown ≈ 1.28 s in, roll ≈ 88% done
+    const sampler = () => -9
+    let rolls = 0
+    let landedAt = -1
+    for (let i = 0; i < 120; i++) {
+      vessel.update(STEP, { throttle: 0, steer: 0, roll: 1 }, sampler)
+      if (vessel.justBarrelRolled) {
+        rolls++
+      }
+      if (vessel.justLanded > 0 && landedAt < 0) {
+        landedAt = i
+      }
+    }
+    expect(landedAt).toBeGreaterThan(0)
+    expect(rolls).toBe(1) // credited at touchdown, not completed in air
+  })
+
   it('ignores roll input on the water', () => {
     const vessel = new Vessel()
     vessel.position.y = -0.3
