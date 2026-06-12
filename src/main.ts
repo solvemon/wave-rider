@@ -3,6 +3,7 @@ import { defaultWaves, surfaceHeight } from './waves'
 import { Ocean } from './ocean'
 import { Vessel, KeyboardInput, createVesselMesh, syncVesselMesh } from './vessel'
 import { ChaseCamera } from './camera'
+import { Sky } from './sky'
 import { createTuningPanel } from './tuning'
 
 const STEP = 1 / 60
@@ -17,10 +18,19 @@ scene.background = new THREE.Color(0xa6c7d9)
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000)
 
+const sky = new Sky()
+scene.add(sky.mesh)
+
 const sun = new THREE.DirectionalLight(0xfff2dd, 2.2)
-sun.position.set(40, 60, -30)
 scene.add(sun)
 scene.add(new THREE.HemisphereLight(0xbcd8e6, 0x1a3a4a, 0.9))
+
+const sunState = { azimuth: 0.6, elevation: 0.18 }
+const applySun = () => {
+  sky.setSun(sunState.azimuth, sunState.elevation)
+  sun.position.copy(sky.sunDir).multiplyScalar(100)
+}
+applySun()
 
 const waves = defaultWaves.map((w) => ({ ...w }))
 const ocean = new Ocean(waves)
@@ -68,6 +78,7 @@ function frame(now: number) {
   syncVesselMesh(vessel, vesselMesh)
   ocean.update(simTime, vessel.position)
   chase.update(dt, vessel)
+  sky.update(camera)
   renderer.render(scene, camera)
   requestAnimationFrame(frame)
 }
