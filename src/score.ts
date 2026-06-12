@@ -4,6 +4,7 @@ export interface Bonus {
   kind: BonusKind
   name: string
   points: number
+  big: boolean // ≥ bigThreshold: yellow popup + charges nitro
 }
 
 // every bonus rolls a random flavor: surf bro / deadpan nautical / maximum dumb
@@ -24,6 +25,7 @@ export interface ScoreTuning {
   megaFactor: number
   smackThreshold: number // m/s into the deck before a hit counts
   megaThreshold: number
+  bigThreshold: number // points at which a bonus turns yellow and feeds nitro
 }
 
 // Calibrated from playtesting: routine wave-chop bouncing peaks around
@@ -38,6 +40,7 @@ export const defaultScoreTuning: ScoreTuning = {
   megaFactor: 24,
   smackThreshold: 7,
   megaThreshold: 10,
+  bigThreshold: 150,
 }
 
 const MIN_AIR_SECONDS = 0.5
@@ -133,7 +136,12 @@ export class ScoreState {
   private award(kind: BonusKind, points: number) {
 
     const pool = NAME_POOLS[kind]
-    const bonus: Bonus = { kind, name: pool[Math.floor(this.random() * pool.length)], points }
+    const bonus: Bonus = {
+      kind,
+      name: pool[Math.floor(this.random() * pool.length)],
+      points,
+      big: points >= this.tuning.bigThreshold,
+    }
 
     this.total += points
     this.queue.push(bonus)

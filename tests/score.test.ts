@@ -38,6 +38,15 @@ describe('ScoreState', () => {
     expect(big.total).toBeGreaterThan(small.total)
   })
 
+  it('flags bonuses at or above the big threshold as big', () => {
+    const score = new ScoreState(() => 0)
+    flyAndLand(score, 2) // 220 points — big
+    score.deckImpact(8, false) // 96 points inside the jump window — not big
+    const bonuses = score.drain()
+    expect(bonuses[0].big).toBe(true)
+    expect(bonuses[1].big).toBe(false)
+  })
+
   it('rolls names from the far end of the pool too', () => {
     const score = new ScoreState(() => 0.99)
     flyAndLand(score, 2)
