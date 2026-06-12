@@ -23,12 +23,53 @@ const MAX_STEP_MOVE = 3 // metres per step — NaN backstop on violent landings
 const SPLASH_MIN_IMPACT = 3
 const SPLASH_INTERVAL = 0.125 // ≤ 8 bursts/s so the doll can't drain the pool
 const UP = new THREE.Vector3(0, 1, 0)
-// hull-local deck plane (top of the rendered hull) the body rests on
-const DECK_Y = 0.4 + VISUAL_FLOAT_OFFSET
-const DECK_HALF_WIDTH = 1.0
-const DECK_HALF_LENGTH = 2.1
-const DECK_SNAP_RANGE = 0.8 // only snap particles near the deck, not ones dangling far below
+const DECK_SNAP_RANGE = 0.45 // only snap particles near the surface — large values teleport side-entries onto ledges
 const DECK_FRICTION = 5
+
+// Hull-local collision heightfield baked from public/jet_ski.stl by
+// scripts/bake-collision.py (includes seat, handlebar cowl and footwells).
+// Regenerate if the model, its load transforms, or the vesselMeshTuning
+// defaults change. -100 marks cells with no hull (no collision).
+const FIELD_X0 = -0.6
+const FIELD_Z0 = -2.0
+const FIELD_CELL_X = 0.1
+const FIELD_CELL_Z = 0.2
+const FIELD_NX = 12
+const FIELD_NZ = 20
+// prettier-ignore
+const FIELD_HEIGHTS = new Float32Array([
+  0.53, 0.53, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.53, 0.54, // z=-1.9
+  0.62, 0.62, 0.52, 0.52, 0.52, 0.52, 0.52, 0.52, 0.52, 0.52, 0.62, 0.62, // z=-1.7
+  0.63, 0.63, 0.53, 0.94, 1.00, 1.00, 1.00, 0.99, 0.90, 0.53, 0.63, 0.63, // z=-1.5
+  0.62, 0.62, 0.52, 0.89, 0.93, 0.93, 0.93, 0.92, 0.82, 0.52, 0.62, 0.62, // z=-1.3
+  0.61, 0.61, 0.50, 0.93, 0.97, 0.97, 0.97, 0.96, 0.88, 0.50, 0.61, 0.61, // z=-1.1
+  0.59, 0.59, 0.49, 0.95, 0.99, 0.99, 0.99, 0.99, 0.90, 0.49, 0.59, 0.59, // z=-0.9
+  0.58, 0.58, 0.48, 0.95, 1.00, 1.00, 1.00, 0.99, 0.91, 0.48, 0.58, 0.58, // z=-0.7
+  0.57, 0.57, 0.46, 0.89, 0.94, 0.94, 0.94, 0.93, 0.84, 0.46, 0.57, 0.57, // z=-0.5
+  0.55, 0.55, 0.45, 0.84, 0.88, 0.88, 0.88, 0.87, 0.79, 0.45, 0.55, 0.55, // z=-0.3
+  0.54, 0.54, 0.43, 0.83, 0.87, 0.87, 0.87, 0.86, 0.77, 0.43, 0.54, 0.54, // z=-0.1
+  0.52, 0.52, 0.42, 0.87, 0.91, 0.91, 0.91, 0.90, 0.81, 0.42, 0.52, 0.52, // z=0.1
+  0.57, 0.57, 0.45, 0.94, 1.00, 1.00, 1.00, 0.98, 0.89, 0.45, 0.57, 0.57, // z=0.3
+  0.80, 0.79, 0.79, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 0.79, 0.79, 0.80, // z=0.5
+  0.86, 0.94, 0.94, 1.00, 1.05, 1.05, 1.04, 1.05, 1.00, 0.93, 0.94, 0.86, // z=0.7
+  0.86, 0.96, 1.00, 1.00, 1.05, 1.04, 1.04, 1.05, 1.00, 1.00, 0.96, 0.86, // z=0.9
+  0.85, 0.96, 1.05, 1.05, 1.03, 1.03, 1.03, 1.03, 1.05, 1.05, 0.96, 0.85, // z=1.1
+  0.86, 0.96, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 0.96, 0.86, // z=1.3
+  0.82, 0.89, 0.93, 0.93, 0.93, 0.93, 0.93, 0.93, 0.93, 0.93, 0.89, 0.82, // z=1.5
+  -100, 0.78, 0.89, 0.89, 0.89, 0.89, 0.89, 0.89, 0.89, 0.89, 0.78, -100, // z=1.7
+  -100, -100, 0.71, 0.80, 0.80, 0.80, 0.80, 0.80, 0.81, 0.71, 0.61, -100, // z=1.9
+])
+
+function deckHeightAt(lx: number, lz: number): number {
+
+  const ix = Math.floor((lx - FIELD_X0) / FIELD_CELL_X)
+  const iz = Math.floor((lz - FIELD_Z0) / FIELD_CELL_Z)
+  if (ix < 0 || ix >= FIELD_NX || iz < 0 || iz >= FIELD_NZ) {
+    return -100
+  }
+
+  return FIELD_HEIGHTS[iz * FIELD_NX + ix]
+}
 
 export interface RagdollTuning {
   gravity: number
@@ -82,21 +123,22 @@ const CONSTRAINTS: Constraint[] = [
   { a: KNEE_L, b: KNEE_R, rest: 0.3 * SCALE }, // keeps the legs from merging into one
 ]
 
-// resting pose offsets in vessel-local space — hands ON the mounts, body
-// stretched back from there (constraint relaxation tidies it up in frames)
+// resting pose offsets in vessel-local space: a riding posture — hands on
+// the bars, pelvis over the seat, feet in the footwells (constraint
+// relaxation + the hull heightfield settle him onto the model in frames)
 const POSE: [number, number, number][] = [
-  [-0.35, 0.5, 1.5],
-  [0.35, 0.5, 1.5],
-  [-0.39, 0.44, 1.18],
-  [0.39, 0.44, 1.18],
-  [-0.23, 0.5, 0.85],
-  [0.23, 0.5, 0.85],
-  [0, 0.7, 0.65],
-  [0, 0.44, 0.13],
-  [-0.16, 0.36, -0.39],
-  [0.16, 0.36, -0.39],
-  [-0.18, 0.3, -0.91],
-  [0.18, 0.3, -0.91],
+  [-0.2, 1.0, 0.7],
+  [0.2, 1.0, 0.7],
+  [-0.3, 0.65, 0.45],
+  [0.3, 0.65, 0.45],
+  [-0.23, 0.7, 0.15],
+  [0.23, 0.7, 0.15],
+  [0, 0.9, 0.0],
+  [0, 0.5, -0.5],
+  [-0.3, 0.3, -0.95],
+  [0.3, 0.3, -0.95],
+  [-0.45, 0.1, -1.3],
+  [0.45, 0.1, -1.3],
 ]
 
 // thighs are handled separately — they render from fanned-out hip points
@@ -249,16 +291,20 @@ export class Ragdoll {
       }
       const p = this.particles[i]
       this.tmp.copy(p.pos).sub(vessel.position).applyQuaternion(this.invOrientation)
-      const onFootprint = Math.abs(this.tmp.x) < DECK_HALF_WIDTH && Math.abs(this.tmp.z) < DECK_HALF_LENGTH
-      if (onFootprint && this.tmp.y < DECK_Y && this.tmp.y > DECK_Y - DECK_SNAP_RANGE) {
+      const hullTop = deckHeightAt(this.tmp.x, this.tmp.z)
+      if (this.tmp.y < hullTop && this.tmp.y > hullTop - DECK_SNAP_RANGE) {
         // closing speed of the particle onto the (possibly moving) deck
         const closing = (p.prev.y - p.pos.y) / dt + vessel.vy
         if (closing > 0 && (this.deckImpact === null || closing > this.deckImpact.force)) {
           this.impactPoint.copy(p.pos)
           this.deckImpact = { force: closing, head: i === HEAD, point: this.impactPoint }
         }
-        this.tmp.y = DECK_Y
+        this.tmp.y = hullTop
         p.pos.copy(this.tmp.applyQuaternion(this.orientation).add(vessel.position))
+        // Inelastic vertical contact: snapping pos without touching prev
+        // would inject snap-distance/dt of upward velocity — a particle
+        // dragged under a taller heightfield cell would launch the doll.
+        p.prev.y = p.pos.y
         const friction = Math.min(DECK_FRICTION * dt, 1)
         p.prev.x += (p.pos.x - p.prev.x) * friction
         p.prev.z += (p.pos.z - p.prev.z) * friction
