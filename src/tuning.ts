@@ -13,6 +13,7 @@ export interface TuningTargets {
   sun: { azimuth: number; elevation: number }
   onSunChanged: () => void
   oceanFoam: { threshold: number; intensity: number }
+  oceanRipple: { strength: number }
   wake: WakeTuning
   splash: SplashTuning
 }
@@ -74,6 +75,7 @@ export function createTuningPanel(targets: TuningTargets): GUI {
   visuals.add(targets.sun, 'elevation', 0.03, 1.2, 0.01).onChange(targets.onSunChanged)
   visuals.add(targets.oceanFoam, 'threshold', 0, 1, 0.01).name('foamThreshold')
   visuals.add(targets.oceanFoam, 'intensity', 0, 1.5, 0.01).name('foamIntensity')
+  visuals.add(targets.oceanRipple, 'strength', 0, 1, 0.01).name('rippleStrength')
   visuals.add(targets.wake, 'width', 0.5, 6, 0.1).name('wakeWidth')
   visuals.add(targets.wake, 'lifetime', 0.5, 6, 0.1).name('wakeLifetime')
   visuals.add(targets.splash, 'sprayRate', 0, 3, 0.05)

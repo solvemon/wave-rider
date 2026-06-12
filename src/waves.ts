@@ -21,7 +21,10 @@ export const defaultWaves: WaveParams[] = [
   { direction: -0.9, amplitude: 0.25, wavelength: 16, steepness: 0.5, speed: 4.0 },
   { direction: 1.8, amplitude: 0.18, wavelength: 11, steepness: 0.5, speed: 3.4 },
   { direction: 2.6, amplitude: 0.12, wavelength: 7, steepness: 0.4, speed: 2.6 },
-  { direction: -2.2, amplitude: 0.08, wavelength: 4.5, steepness: 0.3, speed: 2.1 },
+  // shortest chop kept long+gentle on purpose: a coherent sinusoid below ~6 m
+  // reads as visible banding; the finest detail comes from noise ripples in
+  // the ocean fragment shader instead (see uRippleStrength in ocean.ts)
+  { direction: -2.2, amplitude: 0.05, wavelength: 6.5, steepness: 0.3, speed: 2.1 },
 ]
 
 /**

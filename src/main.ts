@@ -60,6 +60,7 @@ createTuningPanel({
   sun: sunState,
   onSunChanged: applySun,
   oceanFoam: ocean.foam,
+  oceanRipple: ocean.ripple,
   wake: wake.tuning,
   splash: splash.tuning,
 })

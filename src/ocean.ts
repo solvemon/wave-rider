@@ -29,6 +29,7 @@ uniform vec3 uSunDir;
 uniform vec3 uHorizonColor;
 uniform float uFoamThreshold;
 uniform float uFoamIntensity;
+uniform float uRippleStrength;
 varying vec3 vWorldPos;
 varying vec2 vGridPos;
 varying float vHeight;
@@ -57,6 +58,19 @@ void main() {
   float crest;
   gerstnerSurface(vGridPos, dispUnused, n, crest);
 
+  // Detail ripples: a coherent sinusoid at the smallest scale always reads as
+  // bands (wave addition can't break up its own shortest frequency), so the
+  // finest detail comes from scrolling noise gradients instead. Visual only.
+  float e = 0.35;
+  vec2 dp = vWorldPos.xz * 0.55 + vec2(uTime * 0.40, uTime * 0.23);
+  float n0 = noise(dp);
+  vec2 g1 = vec2(noise(dp + vec2(e, 0.0)) - n0, noise(dp + vec2(0.0, e)) - n0);
+  vec2 dp2 = vWorldPos.xz * 1.7 - vec2(uTime * 0.31, uTime * 0.47);
+  float m0 = noise(dp2);
+  vec2 g2 = vec2(noise(dp2 + vec2(e, 0.0)) - m0, noise(dp2 + vec2(0.0, e)) - m0);
+  vec2 g = (g1 + g2 * 0.5) * uRippleStrength;
+  n = normalize(n + vec3(-g.x, 0.0, -g.y));
+
   float diff = max(dot(n, uSunDir), 0.0);
   col *= 0.55 + 0.45 * diff;
 
@@ -84,6 +98,8 @@ export class Ocean {
   readonly mesh: THREE.Mesh
   /** Live foam tuning — read into uniforms every frame. */
   foam = { threshold: 0.22, intensity: 0.9 }
+  /** Noise detail-normal strength — the broadband substitute for short coherent chop. */
+  ripple = { strength: 0.35 }
   private readonly material: THREE.ShaderMaterial
 
   constructor(waves: WaveParams[], sunDir: THREE.Vector3, horizonColor: THREE.Color) {
@@ -102,6 +118,7 @@ export class Ocean {
         uHorizonColor: { value: horizonColor },
         uFoamThreshold: { value: this.foam.threshold },
         uFoamIntensity: { value: this.foam.intensity },
+        uRippleStrength: { value: this.ripple.strength },
       },
     })
 
@@ -128,6 +145,7 @@ export class Ocean {
     this.material.uniforms.uTime.value = time
     this.material.uniforms.uFoamThreshold.value = this.foam.threshold
     this.material.uniforms.uFoamIntensity.value = this.foam.intensity
+    this.material.uniforms.uRippleStrength.value = this.ripple.strength
     const step = OCEAN_SIZE / SEGMENTS
     this.mesh.position.x = Math.round(center.x / step) * step
     this.mesh.position.z = Math.round(center.z / step) * step
