@@ -6,35 +6,32 @@ const SEGMENTS = 512
 
 const vertexShader = gerstnerGLSL + /* glsl */ `
 varying vec3 vWorldPos;
-varying vec3 vNormal;
+varying vec2 vGridPos;
 varying float vHeight;
-varying float vCrest;
 
 void main() {
   vec4 worldPos = modelMatrix * vec4(position, 1.0);
-  vec3 disp;
-  vec3 normal;
-  float crest;
-  gerstnerSurface(worldPos.xz, disp, normal, crest);
+  vGridPos = worldPos.xz; // undisplaced grid position — fragment re-evaluates waves per pixel
+  vec3 disp = gerstnerDisplace(worldPos.xz);
   worldPos.xyz += disp;
   vWorldPos = worldPos.xyz;
-  vNormal = normal;
   vHeight = disp.y; // raw vertical Gerstner component, not the corrected surfaceHeight()
-  vCrest = crest;
   gl_Position = projectionMatrix * viewMatrix * worldPos;
 }
 `
 
-const fragmentShader = /* glsl */ `
+// Normals and crest are evaluated PER PIXEL (gerstnerSurface on the
+// interpolated grid position): per-vertex normals undersample the short chop
+// waves (~5 vertices per wavelength) and the sharp specular turns that into
+// visible moiré banding against the mesh grid.
+const fragmentShader = gerstnerGLSL + /* glsl */ `
 uniform vec3 uSunDir;
 uniform vec3 uHorizonColor;
 uniform float uFoamThreshold;
 uniform float uFoamIntensity;
-uniform float uTime;
 varying vec3 vWorldPos;
-varying vec3 vNormal;
+varying vec2 vGridPos;
 varying float vHeight;
-varying float vCrest;
 
 float hash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -55,7 +52,11 @@ void main() {
   float h = clamp(vHeight * 0.15 + 0.5, 0.0, 1.0);
   vec3 col = mix(deep, shallow, h);
 
-  vec3 n = normalize(vNormal);
+  vec3 dispUnused;
+  vec3 n;
+  float crest;
+  gerstnerSurface(vGridPos, dispUnused, n, crest);
+
   float diff = max(dot(n, uSunDir), 0.0);
   col *= 0.55 + 0.45 * diff;
 
@@ -69,7 +70,7 @@ void main() {
 
   float breakup = noise(vWorldPos.xz * 0.9 + uTime * 0.25) * 0.6
                 + noise(vWorldPos.xz * 2.7 - uTime * 0.15) * 0.4;
-  float foam = smoothstep(uFoamThreshold, uFoamThreshold + 0.18, vCrest * (0.55 + 0.9 * breakup));
+  float foam = smoothstep(uFoamThreshold, uFoamThreshold + 0.18, crest * (0.55 + 0.9 * breakup));
   col = mix(col, vec3(0.96, 0.97, 0.94), foam * uFoamIntensity);
 
   float dist = length(vWorldPos.xz - cameraPosition.xz);
