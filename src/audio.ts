@@ -240,7 +240,7 @@ class Sfx {
       .catch(() => this.load(name, extIndex + 1))
   }
 
-  play(name: SfxName, volume = 1) {
+  play(name: SfxName, volume = 1, options: { rate?: number; delay?: number; lowpassHz?: number } = {}) {
 
     const buffer = this.buffers.get(name)
     if (buffer === undefined) {
@@ -249,11 +249,41 @@ class Sfx {
 
     const source = this.ctx.createBufferSource()
     source.buffer = buffer
-    source.playbackRate.value = 0.9 + Math.random() * 0.2
+    source.playbackRate.value = (options.rate ?? 1) * (0.95 + Math.random() * 0.1)
     const gain = this.ctx.createGain()
     gain.gain.value = volume
-    source.connect(gain).connect(this.destination)
-    source.start()
+
+    let tail: AudioNode = gain
+    if (options.lowpassHz !== undefined) {
+      const filter = this.ctx.createBiquadFilter()
+      filter.type = 'lowpass'
+      filter.frequency.value = options.lowpassHz
+      gain.connect(filter)
+      tail = filter
+    }
+
+    source.connect(gain)
+    tail.connect(this.destination)
+    source.start(this.ctx.currentTime + (options.delay ?? 0))
+  }
+
+  /** Synthesized low "whomp" — fakes the low-end mass small recordings lack. */
+  thump(volume: number) {
+
+    const t = this.ctx.currentTime
+    const osc = this.ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(55, t)
+    osc.frequency.exponentialRampToValueAtTime(28, t + 0.25)
+
+    const gain = this.ctx.createGain()
+    gain.gain.setValueAtTime(0, t)
+    gain.gain.linearRampToValueAtTime(volume, t + 0.008)
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4)
+
+    osc.connect(gain).connect(this.destination)
+    osc.start(t)
+    osc.stop(t + 0.45)
   }
 }
 
@@ -305,10 +335,20 @@ export class AudioSystem {
   }
 
   landed(impact: number) {
+
     this.model.bogDown(Math.min(impact * 0.04, 0.35))
-    if (impact > 3) {
-      this.sfx?.play('splash', Math.min(impact / 10, 1))
+    if (impact <= 3 || this.sfx === null) {
+      return
     }
+
+    // layered "big splash": harder landings pitch lower and hit heavier
+    const force = Math.min((impact - 3) / 9, 1) // 0..1 over the 3..12 m/s range
+    const volume = 0.5 + force * 0.5
+    const baseRate = 0.85 - force * 0.3
+    this.sfx.play('splash', volume, { rate: baseRate }) // main event, pitched down
+    this.sfx.play('splash', volume * 0.45, { rate: baseRate * 1.7 }) // initial slap
+    this.sfx.play('splash', volume * 0.85, { rate: baseRate * 0.5, delay: 0.03, lowpassHz: 500 }) // heavy body
+    this.sfx.thump(0.25 + force * 0.55)
   }
 
   tookOff() {
