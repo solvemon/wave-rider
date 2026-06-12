@@ -51,38 +51,42 @@ interface Constraint {
   rest: number
 }
 
-// (a, b, rest length) — ~1.7 m figure
+// Oversized on purpose (~2.2 m figure) so he reads clearly from the chase cam.
+const SCALE = 1.3
+
+// (a, b, rest length)
 const CONSTRAINTS: Constraint[] = [
-  { a: HAND_L, b: ELBOW_L, rest: 0.28 },
-  { a: HAND_R, b: ELBOW_R, rest: 0.28 },
-  { a: ELBOW_L, b: SHOULDER_L, rest: 0.3 },
-  { a: ELBOW_R, b: SHOULDER_R, rest: 0.3 },
-  { a: SHOULDER_L, b: SHOULDER_R, rest: 0.36 },
-  { a: SHOULDER_L, b: HEAD, rest: 0.28 },
-  { a: SHOULDER_R, b: HEAD, rest: 0.28 },
-  { a: SHOULDER_L, b: PELVIS, rest: 0.55 },
-  { a: SHOULDER_R, b: PELVIS, rest: 0.55 },
-  { a: HEAD, b: PELVIS, rest: 0.75 }, // anti-fold brace
-  { a: PELVIS, b: KNEE_L, rest: 0.42 },
-  { a: PELVIS, b: KNEE_R, rest: 0.42 },
-  { a: KNEE_L, b: FOOT_L, rest: 0.4 },
-  { a: KNEE_R, b: FOOT_R, rest: 0.4 },
+  { a: HAND_L, b: ELBOW_L, rest: 0.28 * SCALE },
+  { a: HAND_R, b: ELBOW_R, rest: 0.28 * SCALE },
+  { a: ELBOW_L, b: SHOULDER_L, rest: 0.3 * SCALE },
+  { a: ELBOW_R, b: SHOULDER_R, rest: 0.3 * SCALE },
+  { a: SHOULDER_L, b: SHOULDER_R, rest: 0.36 * SCALE },
+  { a: SHOULDER_L, b: HEAD, rest: 0.28 * SCALE },
+  { a: SHOULDER_R, b: HEAD, rest: 0.28 * SCALE },
+  { a: SHOULDER_L, b: PELVIS, rest: 0.55 * SCALE },
+  { a: SHOULDER_R, b: PELVIS, rest: 0.55 * SCALE },
+  { a: HEAD, b: PELVIS, rest: 0.75 * SCALE }, // anti-fold brace
+  { a: PELVIS, b: KNEE_L, rest: 0.42 * SCALE },
+  { a: PELVIS, b: KNEE_R, rest: 0.42 * SCALE },
+  { a: KNEE_L, b: FOOT_L, rest: 0.4 * SCALE },
+  { a: KNEE_R, b: FOOT_R, rest: 0.4 * SCALE },
 ]
 
-// resting pose offsets in vessel-local space (hands land on the mounts)
+// resting pose offsets in vessel-local space — hands ON the mounts, body
+// stretched back from there (constraint relaxation tidies it up in frames)
 const POSE: [number, number, number][] = [
   [-0.35, 0.5, 1.5],
   [0.35, 0.5, 1.5],
-  [-0.3, 0.45, 1.25],
-  [0.3, 0.45, 1.25],
-  [-0.18, 0.5, 1.0],
-  [0.18, 0.5, 1.0],
-  [0, 0.65, 0.85],
-  [0, 0.45, 0.45],
-  [-0.12, 0.4, 0.05],
-  [0.12, 0.4, 0.05],
-  [-0.14, 0.35, -0.35],
-  [0.14, 0.35, -0.35],
+  [-0.39, 0.44, 1.18],
+  [0.39, 0.44, 1.18],
+  [-0.23, 0.5, 0.85],
+  [0.23, 0.5, 0.85],
+  [0, 0.7, 0.65],
+  [0, 0.44, 0.13],
+  [-0.16, 0.36, -0.39],
+  [0.16, 0.36, -0.39],
+  [-0.18, 0.3, -0.91],
+  [0.18, 0.3, -0.91],
 ]
 
 const LIMB_BONES: [number, number][] = [
@@ -126,16 +130,16 @@ export class Ragdoll {
 
     const wetsuit = new THREE.MeshStandardMaterial({ color: 0xffd54f })
     for (const [a, b] of LIMB_BONES) {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1, 0.14), wetsuit)
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.14 * SCALE, 1, 0.14 * SCALE), wetsuit)
       this.limbMeshes.push({ mesh, a, b })
       this.group.add(mesh)
     }
 
-    this.torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1, 0.18), wetsuit)
+    this.torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.34 * SCALE, 1, 0.18 * SCALE), wetsuit)
     this.group.add(this.torsoMesh)
 
     this.headMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.26, 0.26, 0.26),
+      new THREE.BoxGeometry(0.26 * SCALE, 0.26 * SCALE, 0.26 * SCALE),
       new THREE.MeshStandardMaterial({ color: 0xfafafa }),
     )
     this.group.add(this.headMesh)

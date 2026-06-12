@@ -172,13 +172,6 @@ export function createVesselMesh(): THREE.Group {
   hull.position.y = 0.1
   group.add(hull)
 
-  const cabin = new THREE.Mesh(
-    new THREE.BoxGeometry(1.0, 0.5, 1.2),
-    new THREE.MeshStandardMaterial({ color: 0xfff3e0 }),
-  )
-  cabin.position.set(0, 0.55, -0.4)
-  group.add(cabin)
-
   return group
 }
 
