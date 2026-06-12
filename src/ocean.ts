@@ -13,7 +13,7 @@ void main() {
   vec3 disp = gerstnerDisplace(worldPos.xz);
   worldPos.xyz += disp;
   vWorldPos = worldPos.xyz;
-  vHeight = disp.y;
+  vHeight = disp.y; // raw vertical Gerstner component, not the corrected surfaceHeight()
   gl_Position = projectionMatrix * viewMatrix * worldPos;
 }
 `
@@ -66,7 +66,7 @@ export class Ocean {
 
   /** Re-pack wave params into uniforms. Call whenever the tuning panel changes them. */
   updateWaves(waves: WaveParams[]) {
-    for (let i = 0; i < NUM_WAVES; i++) {
+    for (let i = 0; i < Math.min(waves.length, NUM_WAVES); i++) {
       const w = waves[i]
       this.material.uniforms.uWaveA.value[i].set(Math.cos(w.direction), Math.sin(w.direction), w.amplitude, w.wavelength)
       this.material.uniforms.uWaveB.value[i].set(w.steepness, w.speed)
