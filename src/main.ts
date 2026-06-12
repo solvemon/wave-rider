@@ -118,6 +118,14 @@ const gui = createTuningPanel({
 })
 if (touch !== null) {
   gui.hide() // the panel covers a phone screen; tuning is a desktop activity
+} else {
+  const help = document.createElement('div')
+  help.style.cssText =
+    'position:fixed;bottom:14px;left:50%;transform:translateX(-50%);font:600 13px/1.5 ui-monospace,monospace;' +
+    'color:rgba(255,255,255,.75);text-shadow:0 1px 0 rgba(0,0,0,.5);z-index:10;pointer-events:none;' +
+    'text-align:center;letter-spacing:.5px;'
+  help.innerHTML = 'W/S throttle &nbsp;·&nbsp; A/D steer &nbsp;·&nbsp; Q/E barrel roll &nbsp;·&nbsp; SPACE nitro &nbsp;·&nbsp; R reset rider &nbsp;·&nbsp; H tuning panel'
+  document.body.appendChild(help)
 }
 
 ragdoll.reset(vessel)
