@@ -70,6 +70,7 @@ const CONSTRAINTS: Constraint[] = [
   { a: PELVIS, b: KNEE_R, rest: 0.42 * SCALE },
   { a: KNEE_L, b: FOOT_L, rest: 0.4 * SCALE },
   { a: KNEE_R, b: FOOT_R, rest: 0.4 * SCALE },
+  { a: KNEE_L, b: KNEE_R, rest: 0.3 * SCALE }, // keeps the legs from merging into one
 ]
 
 // resting pose offsets in vessel-local space — hands ON the mounts, body
@@ -89,16 +90,17 @@ const POSE: [number, number, number][] = [
   [0.18, 0.3, -0.91],
 ]
 
+// thighs are handled separately — they render from fanned-out hip points
 const LIMB_BONES: [number, number][] = [
   [HAND_L, ELBOW_L],
   [HAND_R, ELBOW_R],
   [ELBOW_L, SHOULDER_L],
   [ELBOW_R, SHOULDER_R],
-  [PELVIS, KNEE_L],
-  [PELVIS, KNEE_R],
   [KNEE_L, FOOT_L],
   [KNEE_R, FOOT_R],
 ]
+
+const HIP_HALF_WIDTH = 0.13 * SCALE
 
 /**
  * Verlet ragdoll pinned by the hands to the front deck. Position-based:
@@ -113,6 +115,10 @@ export class Ragdoll {
   private readonly limbMeshes: { mesh: THREE.Mesh; a: number; b: number }[] = []
   private readonly torsoMesh: THREE.Mesh
   private readonly headMesh: THREE.Mesh
+  private readonly thighMeshL: THREE.Mesh
+  private readonly thighMeshR: THREE.Mesh
+  private readonly bodyRight = new THREE.Vector3()
+  private readonly hip = new THREE.Vector3()
   private readonly mountL = new THREE.Vector3()
   private readonly mountR = new THREE.Vector3()
   private readonly orientation = new THREE.Quaternion()
@@ -137,6 +143,10 @@ export class Ragdoll {
 
     this.torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.34 * SCALE, 1, 0.18 * SCALE), wetsuit)
     this.group.add(this.torsoMesh)
+
+    this.thighMeshL = new THREE.Mesh(new THREE.BoxGeometry(0.14 * SCALE, 1, 0.14 * SCALE), wetsuit)
+    this.thighMeshR = new THREE.Mesh(new THREE.BoxGeometry(0.14 * SCALE, 1, 0.14 * SCALE), wetsuit)
+    this.group.add(this.thighMeshL, this.thighMeshR)
 
     this.headMesh = new THREE.Mesh(
       new THREE.BoxGeometry(0.26 * SCALE, 0.26 * SCALE, 0.26 * SCALE),
@@ -272,6 +282,14 @@ export class Ragdoll {
 
     this.shoulderMid.copy(this.particles[SHOULDER_L].pos).add(this.particles[SHOULDER_R].pos).multiplyScalar(0.5)
     this.placeBone(this.torsoMesh, this.shoulderMid, this.particles[PELVIS].pos)
+
+    // thighs render from hips fanned out along the body's right axis, so the
+    // legs read as two even though physics shares one pelvis particle
+    this.bodyRight.copy(this.particles[SHOULDER_R].pos).sub(this.particles[SHOULDER_L].pos).normalize()
+    this.hip.copy(this.particles[PELVIS].pos).addScaledVector(this.bodyRight, -HIP_HALF_WIDTH)
+    this.placeBone(this.thighMeshL, this.hip, this.particles[KNEE_L].pos)
+    this.hip.copy(this.particles[PELVIS].pos).addScaledVector(this.bodyRight, HIP_HALF_WIDTH)
+    this.placeBone(this.thighMeshR, this.hip, this.particles[KNEE_R].pos)
 
     this.headMesh.position.copy(this.particles[HEAD].pos)
   }
