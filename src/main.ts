@@ -116,6 +116,7 @@ const gui = createTuningPanel({
   nitro: nitro.tuning,
   audio: audio.tuning,
 })
+gui.close() // start collapsed — H or the title bar opens it
 if (touch !== null) {
   gui.hide() // the panel covers a phone screen; tuning is a desktop activity
 } else {
@@ -160,10 +161,16 @@ function frame(now: number) {
 
   while (accumulator >= STEP) {
     simTime += STEP
-    gatedInput.throttle = THREE.MathUtils.clamp(input.state.throttle + (touch?.state.throttle ?? 0), -1, 1)
+    // boost implies full throttle — one button does both, no gas-juggling
+    const boostWanted = input.state.boost === true || touch?.state.boost === true
+    gatedInput.throttle = THREE.MathUtils.clamp(
+      input.state.throttle + (touch?.state.throttle ?? 0) + (boostWanted ? 1 : 0),
+      -1,
+      1,
+    )
     gatedInput.steer = THREE.MathUtils.clamp(input.state.steer + (touch?.state.steer ?? 0), -1, 1)
     gatedInput.roll = THREE.MathUtils.clamp((input.state.roll ?? 0) + (touch?.state.roll ?? 0), -1, 1)
-    gatedInput.boost = nitro.tick(STEP, input.state.boost === true || touch?.state.boost === true)
+    gatedInput.boost = nitro.tick(STEP, boostWanted)
     frameBoosting = frameBoosting || gatedInput.boost
     vessel.update(STEP, gatedInput, sampler)
     ragdoll.update(STEP, vessel, sampler, splash)
