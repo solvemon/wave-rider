@@ -216,20 +216,28 @@ class WaterAmbience {
 }
 
 const SFX_NAMES = ['bonus', 'big-bonus', 'splash', 'takeoff', 'nitro'] as const
+const SFX_EXTENSIONS = ['ogg', 'mp3', 'wav']
 type SfxName = (typeof SFX_NAMES)[number]
 
-/** One-shot sample slots — drop files in public/sfx/<name>.mp3 and they play. */
+/** One-shot sample slots — drop files in public/sfx/<name>.{ogg,mp3,wav} and they play. */
 class Sfx {
   private readonly buffers = new Map<SfxName, AudioBuffer>()
 
   constructor(private readonly ctx: AudioContext, private readonly destination: AudioNode) {
     for (const name of SFX_NAMES) {
-      fetch(`${import.meta.env.BASE_URL}sfx/${name}.mp3`)
-        .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error('missing'))))
-        .then((data) => ctx.decodeAudioData(data))
-        .then((buffer) => this.buffers.set(name, buffer))
-        .catch(() => {}) // slot stays silent until an asset shows up
+      this.load(name, 0)
     }
+  }
+
+  private load(name: SfxName, extIndex: number) {
+    if (extIndex >= SFX_EXTENSIONS.length) {
+      return // no asset for this slot — stays silent
+    }
+    fetch(`${import.meta.env.BASE_URL}sfx/${name}.${SFX_EXTENSIONS[extIndex]}`)
+      .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error('missing'))))
+      .then((data) => this.ctx.decodeAudioData(data))
+      .then((buffer) => this.buffers.set(name, buffer))
+      .catch(() => this.load(name, extIndex + 1))
   }
 
   play(name: SfxName, volume = 1) {
