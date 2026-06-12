@@ -48,6 +48,7 @@ export const defaultTuning: VesselTuning = {
 const HULL_HALF_LENGTH = 2
 const HULL_HALF_WIDTH = 0.9
 const AIRBORNE_THRESHOLD = -0.05 // metres of clearance before we call it flight
+const AIRBORNE_CLEAR = 0.02 // hysteresis: stay airborne until properly back in the water
 
 export class Vessel {
   readonly position = new THREE.Vector3(0, 0, 0)
@@ -76,7 +77,9 @@ export class Vessel {
     const waterline = (hBow + hStern + hPort + hStarboard) / 4
     const submersion = waterline - this.position.y
     const wasAirborne = this.airborne
-    this.airborne = submersion < AIRBORNE_THRESHOLD
+    // Hysteresis keeps chop from flickering the airborne state, which would
+    // bleed speed through repeated micro-landings.
+    this.airborne = submersion < (wasAirborne ? AIRBORNE_CLEAR : AIRBORNE_THRESHOLD)
 
     if (this.airborne) {
       this.vy -= t.airGravity * dt
