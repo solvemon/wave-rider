@@ -139,6 +139,38 @@ ragdoll.reset(vessel)
 let simTime = 0
 const sampler = (x: number, z: number) => surfaceHeight(waves, x, z, simTime)
 
+// fullscreen: corner button + double-click/double-tap on the water
+const toggleFullscreen = () => {
+  if (document.fullscreenElement !== null) {
+    void document.exitFullscreen()
+  } else {
+    void document.documentElement.requestFullscreen?.()
+  }
+}
+
+const fsButton = document.createElement('div')
+fsButton.textContent = '⛶'
+fsButton.style.cssText =
+  'position:fixed;top:78px;left:18px;width:40px;height:40px;display:flex;align-items:center;' +
+  'justify-content:center;border-radius:8px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.4);' +
+  'color:#fff;font-size:20px;z-index:20;cursor:pointer;user-select:none;-webkit-user-select:none;' +
+  '-webkit-tap-highlight-color:transparent;'
+fsButton.addEventListener('pointerdown', (e) => {
+  e.preventDefault()
+  toggleFullscreen()
+})
+document.body.appendChild(fsButton)
+
+renderer.domElement.addEventListener('dblclick', toggleFullscreen)
+let lastTap = 0
+renderer.domElement.addEventListener('pointerdown', () => {
+  const now = performance.now()
+  if (now - lastTap < 300) {
+    toggleFullscreen() // manual double-tap — dblclick is unreliable with touch-action:none
+  }
+  lastTap = now
+})
+
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
