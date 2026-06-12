@@ -22,8 +22,8 @@ describe('gerstnerDisplace', () => {
     // other test while silently diverging from the GLSL shader — this fixture
     // is the only automated anchor for that equivalence.
     const cases = [
-      { x: 10, z: 5, t: 2.5, expected: { x: 1.0174285483090622, y: -1.871102781656779, z: 0.3771377616548723 } },
-      { x: -30.7, z: 18.2, t: 12.0, expected: { x: 2.210556020926044, y: -0.5966475035523656, z: 0.06013797818321232 } },
+      { x: 10, z: 5, t: 2.5, expected: { x: 1.0174285483090622, y: -2.8621685363494405, z: 0.3771377616548723 } },
+      { x: -30.7, z: 18.2, t: 12.0, expected: { x: 2.210556020926044, y: -0.46858208969595944, z: 0.06013797818321232 } },
     ]
     for (const { x, z, t, expected } of cases) {
       const out = gerstnerDisplace(defaultWaves, x, z, t, { x: 0, y: 0, z: 0 })

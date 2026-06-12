@@ -16,7 +16,7 @@ export const NUM_WAVES = 6
 
 // Two big jumpable swells + four chop layers for surface texture.
 export const defaultWaves: WaveParams[] = [
-  { direction: 0.0, amplitude: 1.4, wavelength: 70, steepness: 0.8, speed: 9.0 },
+  { direction: 0.0, amplitude: 2.5, wavelength: 70, steepness: 0.8, speed: 9.0 },
   { direction: 0.6, amplitude: 0.9, wavelength: 47, steepness: 0.7, speed: 7.0 },
   { direction: -0.9, amplitude: 0.25, wavelength: 16, steepness: 0.5, speed: 4.0 },
   { direction: 1.8, amplitude: 0.18, wavelength: 11, steepness: 0.5, speed: 3.4 },
