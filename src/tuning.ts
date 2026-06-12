@@ -8,6 +8,7 @@ import type { RagdollTuning } from './ragdoll'
 import type { ScoreTuning } from './score'
 import type { VesselMeshTuning } from './vessel'
 import type { NitroTuning } from './nitro'
+import type { AudioTuning } from './audio'
 
 export interface TuningTargets {
   waves: WaveParams[]
@@ -26,6 +27,7 @@ export interface TuningTargets {
   vesselMesh: VesselMeshTuning
   onVesselMeshChanged: () => void
   nitro: NitroTuning
+  audio: AudioTuning
 }
 
 /** Builds the live tuning panel. Press H to show/hide. */
@@ -118,6 +120,10 @@ export function createTuningPanel(targets: TuningTargets): GUI {
   nitroFolder.add(targets.nitro, 'pointsToFull', 200, 2000, 10)
   nitroFolder.add(targets.nitro, 'drainTime', 1, 6, 0.1)
   nitroFolder.add(targets.vessel, 'boostThrust', 10, 60, 1)
+
+  const audioFolder = gui.addFolder('Audio')
+  audioFolder.add(targets.audio, 'master', 0, 1, 0.01)
+  audioFolder.add(targets.audio, 'engine', 0, 1, 0.01)
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyH') {

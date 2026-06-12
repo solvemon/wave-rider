@@ -48,6 +48,18 @@ buoyancy and attitude, a floaty ballistic air state, cushioned landings.
 feel constant live. Design doc:
 `docs/superpowers/specs/2026-06-12-waverider-prototype-design.md`.
 
+## Sound
+
+The engine and water rush are fully synthesized (Web Audio — no assets,
+no pitch-shifting artifacts). The virtual engine revs with throttle,
+screams unloaded in the air, and bogs down on landings; nitro adds an
+angry detuned layer. Audio starts on your first keypress (browser rule).
+Volumes are in the panel's Audio folder.
+
+One-shot sample slots: drop files in `public/sfx/` named `bonus.mp3`,
+`big-bonus.mp3`, `splash.mp3`, `takeoff.mp3`, `nitro.mp3` and they play
+automatically at the right moments. Missing files are silently skipped.
+
 ## Real vs hacky
 
 **Transferable:** the shared wave function architecture, the Gerstner math,

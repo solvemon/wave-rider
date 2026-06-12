@@ -9,6 +9,7 @@ import { Splash } from './splash'
 import { Ragdoll } from './ragdoll'
 import { ScoreState, ScoreOverlay } from './score'
 import { NitroState, NitroFire, NitroBar } from './nitro'
+import { AudioSystem } from './audio'
 import { createTuningPanel } from './tuning'
 
 const STEP = 1 / 60
@@ -81,6 +82,10 @@ const nitroBar = new NitroBar(document.body)
 // the input's raw boost flag is gated through nitro.tick each physics step
 const gatedInput = { throttle: 0, steer: 0, boost: false, roll: 0 }
 
+const audio = new AudioSystem()
+audio.attach()
+score.onBonus = (b) => audio.bonus(b)
+
 const chase = new ChaseCamera(camera)
 const input = new KeyboardInput()
 
@@ -107,6 +112,7 @@ createTuningPanel({
   vesselMesh: vesselMeshTuning,
   onVesselMeshChanged: applyVesselMeshTuning,
   nitro: nitro.tuning,
+  audio: audio.tuning,
 })
 
 ragdoll.reset(vessel)
@@ -174,6 +180,13 @@ function frame(now: number) {
   splash.update(dt, vessel, pendingLanding, pendingTakeoff)
   nitroFire.update(dt, vessel, frameBoosting)
   nitroBar.set(nitro.charge)
+  if (pendingLanding > 0) {
+    audio.landed(pendingLanding)
+  }
+  if (pendingTakeoff) {
+    audio.tookOff()
+  }
+  audio.update(dt, vessel, frameBoosting, Math.max(input.state.throttle, 0))
   pendingLanding = 0
   pendingTakeoff = false
   chase.update(dt, vessel)
