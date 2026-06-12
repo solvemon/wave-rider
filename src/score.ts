@@ -34,8 +34,8 @@ export const defaultScoreTuning: ScoreTuning = {
   smackFactor: 12,
   headFactor: 18,
   megaFactor: 24,
-  smackThreshold: 4.5,
-  megaThreshold: 9,
+  smackThreshold: 7,
+  megaThreshold: 10,
 }
 
 const MIN_AIR_SECONDS = 0.5
@@ -50,13 +50,25 @@ export class ScoreState {
   private airSeconds = 0
   private snorkelSeconds = 0
   private smackCooldown = 0
+  private suppressTimer = 0
   private readonly queue: Bonus[] = []
 
   constructor(private readonly random: () => number = Math.random) {}
 
+  /** True while smack scoring is paused (e.g. right after a ragdoll reset). */
+  get smacksSuppressed(): boolean {
+    return this.suppressTimer > 0
+  }
+
+  /** Pause smack scoring — the ragdoll reset slams the doll into pose, which must not pay out. */
+  suppressSmacks(seconds: number) {
+    this.suppressTimer = Math.max(this.suppressTimer, seconds)
+  }
+
   tick(dt: number, vesselAirborne: boolean, headSubmerged: boolean) {
 
     this.smackCooldown = Math.max(0, this.smackCooldown - dt)
+    this.suppressTimer = Math.max(0, this.suppressTimer - dt)
     if (vesselAirborne) {
       this.airSeconds += dt
     }
@@ -83,7 +95,7 @@ export class ScoreState {
 
   deckImpact(force: number, head: boolean) {
 
-    if (force < this.tuning.smackThreshold || this.smackCooldown > 0) {
+    if (force < this.tuning.smackThreshold || this.smackCooldown > 0 || this.suppressTimer > 0) {
       return
     }
     this.smackCooldown = SMACK_COOLDOWN

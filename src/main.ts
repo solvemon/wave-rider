@@ -53,15 +53,16 @@ scene.add(splash.points)
 const ragdoll = new Ragdoll()
 scene.add(ragdoll.group)
 
+const score = new ScoreState()
+
 window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyR') {
     ragdoll.reset(vessel)
+    score.suppressSmacks(2) // settling into pose must not pay out
   }
 })
-
-const score = new ScoreState()
 const overlay = new ScoreOverlay(document.body)
-const scoreFx = { shake: 0.05 }
+const scoreFx = { shake: 0.1 }
 
 const chase = new ChaseCamera(camera)
 const input = new KeyboardInput()
@@ -142,7 +143,7 @@ function frame(now: number) {
   sky.update(camera)
   renderer.render(scene, camera)
 
-  if (pendingImpactForce >= score.tuning.smackThreshold) {
+  if (pendingImpactForce >= score.tuning.smackThreshold && !score.smacksSuppressed) {
     splash.burst(lastImpactPoint, Math.min(Math.round(pendingImpactForce * 4), 40), Math.min(pendingImpactForce, 6))
     chase.shake(Math.min(pendingImpactForce * scoreFx.shake, 0.5))
   }

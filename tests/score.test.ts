@@ -49,20 +49,34 @@ describe('ScoreState', () => {
 
   it('tiers deck impacts by force and head flag', () => {
     const score = new ScoreState(() => 0)
-    score.deckImpact(5, false)
+    score.deckImpact(8, false)
     score.tick(0.3, false, false) // clear cooldown
-    score.deckImpact(5, true)
+    score.deckImpact(8, true)
     score.tick(0.3, false, false)
-    score.deckImpact(10, true)
+    score.deckImpact(12, true)
     const kinds = score.drain().map((b) => `${b.kind}:${b.points}`)
-    expect(kinds).toEqual(['smack:60', 'headSmack:90', 'megaSmack:240'])
+    expect(kinds).toEqual(['smack:96', 'headSmack:144', 'megaSmack:288'])
   })
 
   it('suppresses smacks below threshold and inside the cooldown', () => {
     const score = new ScoreState(() => 0)
     score.deckImpact(1, false) // below threshold
-    score.deckImpact(5, false)
-    score.deckImpact(5, false) // inside cooldown
+    score.deckImpact(8, false)
+    score.deckImpact(8, false) // inside cooldown
+    expect(score.drain()).toHaveLength(1)
+  })
+
+  it('ignores smacks during the suppression window after a reset', () => {
+    const score = new ScoreState(() => 0)
+    score.suppressSmacks(2)
+    score.deckImpact(12, false)
+    expect(score.smacksSuppressed).toBe(true)
+    expect(score.drain()).toHaveLength(0)
+    for (let i = 0; i < 130; i++) {
+      score.tick(STEP, false, false) // ~2.2 s
+    }
+    expect(score.smacksSuppressed).toBe(false)
+    score.deckImpact(12, false)
     expect(score.drain()).toHaveLength(1)
   })
 })
