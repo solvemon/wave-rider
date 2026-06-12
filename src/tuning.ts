@@ -2,12 +2,19 @@ import GUI from 'lil-gui'
 import type { WaveParams } from './waves'
 import type { VesselTuning } from './vessel'
 import type { CameraTuning } from './camera'
+import type { WakeTuning } from './wake'
+import type { SplashTuning } from './splash'
 
 export interface TuningTargets {
   waves: WaveParams[]
   onWavesChanged: () => void
   vessel: VesselTuning
   camera: CameraTuning
+  sun: { azimuth: number; elevation: number }
+  onSunChanged: () => void
+  oceanFoam: { threshold: number; intensity: number }
+  wake: WakeTuning
+  splash: SplashTuning
 }
 
 /** Builds the live tuning panel. Press H to show/hide. */
@@ -61,6 +68,16 @@ export function createTuningPanel(targets: TuningTargets): GUI {
   cam.add(c, 'fovBase', 40, 90, 1)
   cam.add(c, 'fovSpeedFactor', 0, 2, 0.05)
   cam.add(c, 'airPullback', 0, 6, 0.25)
+
+  const visuals = gui.addFolder('Visuals')
+  visuals.add(targets.sun, 'azimuth', -Math.PI, Math.PI, 0.01).onChange(targets.onSunChanged)
+  visuals.add(targets.sun, 'elevation', 0.03, 1.2, 0.01).onChange(targets.onSunChanged)
+  visuals.add(targets.oceanFoam, 'threshold', 0, 1, 0.01).name('foamThreshold')
+  visuals.add(targets.oceanFoam, 'intensity', 0, 1.5, 0.01).name('foamIntensity')
+  visuals.add(targets.wake, 'width', 0.5, 6, 0.1).name('wakeWidth')
+  visuals.add(targets.wake, 'lifetime', 0.5, 6, 0.1).name('wakeLifetime')
+  visuals.add(targets.splash, 'sprayRate', 0, 3, 0.05)
+  visuals.add(targets.splash, 'splashIntensity', 0, 3, 0.05)
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyH') {

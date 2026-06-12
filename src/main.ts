@@ -57,6 +57,11 @@ createTuningPanel({
   onWavesChanged: () => ocean.updateWaves(waves),
   vessel: vessel.tuning,
   camera: chase.tuning,
+  sun: sunState,
+  onSunChanged: applySun,
+  oceanFoam: ocean.foam,
+  wake: wake.tuning,
+  splash: splash.tuning,
 })
 
 let simTime = 0
