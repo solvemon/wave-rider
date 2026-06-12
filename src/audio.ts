@@ -6,7 +6,7 @@ export interface AudioTuning {
   engine: number
 }
 
-export const defaultAudioTuning: AudioTuning = { master: 0.5, engine: 0.8 }
+export const defaultAudioTuning: AudioTuning = { master: 0.5, engine: 0.5 }
 
 const IDLE_RPM = 0.15
 const SPOOL_RATE = 4 // 1/s — how fast rpm chases its target
@@ -222,11 +222,42 @@ type SfxName = (typeof SFX_NAMES)[number]
 /** One-shot sample slots — drop files in public/sfx/<name>.{ogg,mp3,wav} and they play. */
 class Sfx {
   private readonly buffers = new Map<SfxName, AudioBuffer>()
+  private readonly smacks: AudioBuffer[] = []
 
   constructor(private readonly ctx: AudioContext, private readonly destination: AudioNode) {
     for (const name of SFX_NAMES) {
       this.load(name, 0)
     }
+    this.loadSmack(1)
+  }
+
+  /** Numbered grunt pool (smack-1.wav, smack-2.wav, …) — stops at the first gap. */
+  private loadSmack(index: number) {
+    fetch(`${import.meta.env.BASE_URL}sfx/smack-${index}.wav`)
+      .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error('missing'))))
+      .then((data) => this.ctx.decodeAudioData(data))
+      .then((buffer) => {
+        this.smacks.push(buffer)
+        this.loadSmack(index + 1)
+      })
+      .catch(() => {})
+  }
+
+  /** A random pained grunt from the pool. */
+  playSmack(volume: number) {
+
+    if (this.smacks.length === 0) {
+      return
+    }
+
+    const buffer = this.smacks[Math.floor(Math.random() * this.smacks.length)]
+    const source = this.ctx.createBufferSource()
+    source.buffer = buffer
+    source.playbackRate.value = 0.95 + Math.random() * 0.1
+    const gain = this.ctx.createGain()
+    gain.gain.value = volume
+    source.connect(gain).connect(this.destination)
+    source.start()
   }
 
   private load(name: SfxName, extIndex: number) {
@@ -356,6 +387,11 @@ export class AudioSystem {
   }
 
   bonus(b: Bonus) {
+
+    if (b.kind === 'smack' || b.kind === 'headSmack' || b.kind === 'megaSmack') {
+      this.sfx?.playSmack(b.kind === 'megaSmack' ? 1 : 0.8)
+      return
+    }
     this.sfx?.play(b.big ? 'big-bonus' : 'bonus', 0.8)
   }
 }
