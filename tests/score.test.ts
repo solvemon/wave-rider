@@ -23,9 +23,9 @@ describe('ScoreState', () => {
     const bonuses = score.drain()
     expect(bonuses).toHaveLength(1)
     expect(bonuses[0].kind).toBe('airtime')
-    expect(bonuses[0].points).toBe(20)
+    expect(bonuses[0].points).toBe(60)
     expect(bonuses[0].name).toBe('BIG AIR')
-    expect(score.total).toBe(20)
+    expect(score.total).toBe(60)
   })
 
   it('rolls names from the far end of the pool too', () => {
@@ -49,13 +49,13 @@ describe('ScoreState', () => {
 
   it('tiers deck impacts by force and head flag', () => {
     const score = new ScoreState(() => 0)
-    score.deckImpact(3, false)
+    score.deckImpact(5, false)
     score.tick(0.3, false, false) // clear cooldown
-    score.deckImpact(3, true)
+    score.deckImpact(5, true)
     score.tick(0.3, false, false)
-    score.deckImpact(8, true)
+    score.deckImpact(10, true)
     const kinds = score.drain().map((b) => `${b.kind}:${b.points}`)
-    expect(kinds).toEqual(['smack:36', 'headSmack:54', 'megaSmack:192'])
+    expect(kinds).toEqual(['smack:60', 'headSmack:90', 'megaSmack:240'])
   })
 
   it('suppresses smacks below threshold and inside the cooldown', () => {

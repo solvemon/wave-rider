@@ -25,14 +25,17 @@ export interface ScoreTuning {
   megaThreshold: number
 }
 
+// Calibrated from playtesting: routine wave-chop bouncing peaks around
+// 4 m/s into the deck — the threshold sits just above it so only real
+// slams score. Airtime outvalues passive smacks on purpose.
 export const defaultScoreTuning: ScoreTuning = {
-  airRate: 10,
+  airRate: 30,
   snorkelRate: 25,
   smackFactor: 12,
   headFactor: 18,
   megaFactor: 24,
-  smackThreshold: 2.5,
-  megaThreshold: 7,
+  smackThreshold: 4.5,
+  megaThreshold: 9,
 }
 
 const MIN_AIR_SECONDS = 0.5
