@@ -27,9 +27,9 @@ describe('Ragdoll', () => {
       doll.update(STEP, vessel, flatWater)
     }
     const handL = doll.particles[0].pos
-    expect(handL.x).toBeCloseTo(-0.35, 3)
-    expect(handL.y).toBeCloseTo(0.5 + VISUAL_FLOAT_OFFSET, 3)
-    expect(handL.z).toBeCloseTo(1.5, 3)
+    expect(handL.x).toBeCloseTo(-doll.tuning.mountX, 3)
+    expect(handL.y).toBeCloseTo(doll.tuning.mountY + VISUAL_FLOAT_OFFSET, 3)
+    expect(handL.z).toBeCloseTo(doll.tuning.mountZ, 3)
   })
 
   it('pushes submerged particles back toward the surface', () => {

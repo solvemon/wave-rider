@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { defaultWaves, surfaceHeight } from './waves'
 import { Ocean } from './ocean'
-import { Vessel, KeyboardInput, createVesselMesh, syncVesselMesh } from './vessel'
+import { Vessel, KeyboardInput, createVesselMesh, syncVesselMesh, vesselMeshTuning, applyVesselMeshTuning } from './vessel'
 import { ChaseCamera } from './camera'
 import { Sky } from './sky'
 import { Wake } from './wake'
@@ -82,6 +82,8 @@ createTuningPanel({
   ragdoll: ragdoll.tuning,
   score: score.tuning,
   scoreFx,
+  vesselMesh: vesselMeshTuning,
+  onVesselMeshChanged: applyVesselMeshTuning,
 })
 
 ragdoll.reset(vessel)

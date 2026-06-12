@@ -6,6 +6,7 @@ import type { WakeTuning } from './wake'
 import type { SplashTuning } from './splash'
 import type { RagdollTuning } from './ragdoll'
 import type { ScoreTuning } from './score'
+import type { VesselMeshTuning } from './vessel'
 
 export interface TuningTargets {
   waves: WaveParams[]
@@ -21,6 +22,8 @@ export interface TuningTargets {
   ragdoll: RagdollTuning
   score: ScoreTuning
   scoreFx: { shake: number }
+  vesselMesh: VesselMeshTuning
+  onVesselMeshChanged: () => void
 }
 
 /** Builds the live tuning panel. Press H to show/hide. */
@@ -90,6 +93,14 @@ export function createTuningPanel(targets: TuningTargets): GUI {
   rag.add(targets.ragdoll, 'gravity', 4, 30, 0.5)
   rag.add(targets.ragdoll, 'damping', 0.9, 0.999, 0.001)
   rag.add(targets.ragdoll, 'waterDrag', 0, 15, 0.25)
+  rag.add(targets.ragdoll, 'mountX', 0.05, 0.8, 0.01)
+  rag.add(targets.ragdoll, 'mountY', 0.2, 2, 0.01)
+  rag.add(targets.ragdoll, 'mountZ', -2, 2, 0.01)
+
+  const vesselMesh = gui.addFolder('Vessel')
+  vesselMesh.add(targets.vesselMesh, 'scale', 0.5, 2, 0.01).onChange(targets.onVesselMeshChanged)
+  vesselMesh.add(targets.vesselMesh, 'offsetY', -0.5, 1.5, 0.01).onChange(targets.onVesselMeshChanged)
+  vesselMesh.add(targets.vesselMesh, 'rotY', -Math.PI, Math.PI, 0.01).onChange(targets.onVesselMeshChanged)
 
   const scoreFolder = gui.addFolder('Score')
   scoreFolder.add(targets.score, 'smackThreshold', 1, 8, 0.1)

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 
 export interface VesselInput {
   throttle: number // -1..1, W = +1
@@ -161,16 +162,58 @@ export class Vessel {
   }
 }
 
+export interface VesselMeshTuning {
+  scale: number // multiplier on the length-matched base scale
+  offsetY: number // vertical placement of the model relative to the physics point
+  rotY: number // spin the model if the STL's nose points the wrong way
+}
+
+export const vesselMeshTuning: VesselMeshTuning = { scale: 1, offsetY: 0.35, rotY: Math.PI }
+
+let jetski: THREE.Mesh | null = null
+
+/** Re-apply the live mesh-placement tuning (GUI onChange + after load). */
+export function applyVesselMeshTuning() {
+
+  if (jetski === null) {
+    return
+  }
+
+  jetski.scale.setScalar(vesselMeshTuning.scale)
+  jetski.position.y = vesselMeshTuning.offsetY
+  jetski.rotation.y = vesselMeshTuning.rotY
+}
+
+/**
+ * POC jetski model (binary STL, mm, Z-up print orientation). Loaded async:
+ * the group ships with the old placeholder box, swapped out when the STL
+ * arrives. STL is a stopgap — replace with a real authored asset later.
+ */
 export function createVesselMesh(): THREE.Group {
 
   const group = new THREE.Group()
 
-  const hull = new THREE.Mesh(
+  const fallback = new THREE.Mesh(
     new THREE.BoxGeometry(HULL_HALF_WIDTH * 2, 0.6, HULL_HALF_LENGTH * 2),
     new THREE.MeshStandardMaterial({ color: 0xff7043 }),
   )
-  hull.position.y = 0.1
-  group.add(hull)
+  fallback.position.y = 0.1
+  group.add(fallback)
+
+  new STLLoader().load(`${import.meta.env.BASE_URL}jet_ski.stl`, (geometry) => {
+    geometry.center()
+    geometry.rotateX(-Math.PI / 2) // print Z-up → world Y-up; model length lands on Z
+    geometry.computeBoundingBox()
+
+    const size = geometry.boundingBox!.getSize(new THREE.Vector3())
+    const baseScale = (HULL_HALF_LENGTH * 2) / size.z
+    geometry.scale(baseScale, baseScale, baseScale)
+
+    jetski = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xff7043 }))
+    group.remove(fallback)
+    group.add(jetski)
+    applyVesselMeshTuning()
+  })
 
   return group
 }

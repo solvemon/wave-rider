@@ -22,8 +22,6 @@ const ITERATIONS = 4
 const MAX_STEP_MOVE = 3 // metres per step — NaN backstop on violent landings
 const SPLASH_MIN_IMPACT = 3
 const SPLASH_INTERVAL = 0.125 // ≤ 8 bursts/s so the doll can't drain the pool
-const MOUNT_L = new THREE.Vector3(-0.35, 0.5 + VISUAL_FLOAT_OFFSET, 1.5)
-const MOUNT_R = new THREE.Vector3(0.35, 0.5 + VISUAL_FLOAT_OFFSET, 1.5)
 const UP = new THREE.Vector3(0, 1, 0)
 // hull-local deck plane (top of the rendered hull) the body rests on
 const DECK_Y = 0.4 + VISUAL_FLOAT_OFFSET
@@ -36,9 +34,20 @@ export interface RagdollTuning {
   gravity: number
   damping: number
   waterDrag: number
+  mountX: number // half-spread of the hand grips (handlebar width)
+  mountY: number // grip height above the physics point
+  mountZ: number // grip forward position
 }
 
-export const defaultRagdollTuning: RagdollTuning = { gravity: 14, damping: 0.985, waterDrag: 6 }
+// mount defaults are a first guess at the jetski handlebar — tune live
+export const defaultRagdollTuning: RagdollTuning = {
+  gravity: 14,
+  damping: 0.985,
+  waterDrag: 6,
+  mountX: 0.2,
+  mountY: 1.0,
+  mountZ: 0.7,
+}
 
 export interface RagdollParticle {
   pos: THREE.Vector3
@@ -281,11 +290,14 @@ export class Ragdoll {
 
   private computeMounts(vessel: Vessel) {
 
+    const t = this.tuning
     this.euler.set(-vessel.pitch, vessel.yaw, -vessel.roll)
     this.orientation.setFromEuler(this.euler)
     this.invOrientation.copy(this.orientation).invert()
-    this.mountL.copy(MOUNT_L).applyQuaternion(this.orientation).add(vessel.position)
-    this.mountR.copy(MOUNT_R).applyQuaternion(this.orientation).add(vessel.position)
+    this.mountL.set(-t.mountX, t.mountY + VISUAL_FLOAT_OFFSET, t.mountZ)
+      .applyQuaternion(this.orientation).add(vessel.position)
+    this.mountR.set(t.mountX, t.mountY + VISUAL_FLOAT_OFFSET, t.mountZ)
+      .applyQuaternion(this.orientation).add(vessel.position)
   }
 
   private syncMeshes() {
