@@ -159,18 +159,18 @@ export class NitroFire {
 export class NitroBar {
   private readonly fill: HTMLDivElement
 
-  constructor(parent: HTMLElement) {
+  constructor(parent: HTMLElement, bottom = 16) {
 
     const label = document.createElement('div')
     label.style.cssText =
-      'position:fixed;bottom:36px;left:18px;font:700 12px/1 ui-monospace,monospace;color:#fff;' +
+      `position:fixed;bottom:${bottom + 20}px;left:18px;font:700 12px/1 ui-monospace,monospace;color:#fff;` +
       'text-shadow:0 1px 0 rgba(0,0,0,.5);z-index:10;pointer-events:none;letter-spacing:2px;'
     label.textContent = 'NITRO'
     parent.appendChild(label)
 
     const track = document.createElement('div')
     track.style.cssText =
-      'position:fixed;bottom:16px;left:18px;width:220px;height:12px;border-radius:6px;' +
+      `position:fixed;bottom:${bottom}px;left:18px;width:220px;height:12px;border-radius:6px;` +
       'background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.4);z-index:10;' +
       'pointer-events:none;overflow:hidden;'
     parent.appendChild(track)

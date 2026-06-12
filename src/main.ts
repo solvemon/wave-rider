@@ -10,6 +10,7 @@ import { Ragdoll } from './ragdoll'
 import { ScoreState, ScoreOverlay } from './score'
 import { NitroState, NitroFire, NitroBar } from './nitro'
 import { AudioSystem } from './audio'
+import { TouchControls } from './touch'
 import { createTuningPanel } from './tuning'
 
 const STEP = 1 / 60
@@ -78,7 +79,8 @@ const scoreFx = { shake: 0.1 }
 const nitro = new NitroState()
 const nitroFire = new NitroFire()
 scene.add(nitroFire.points)
-const nitroBar = new NitroBar(document.body)
+const touch = TouchControls.isTouchDevice() ? new TouchControls(document.body) : null
+const nitroBar = new NitroBar(document.body, touch !== null ? 192 : 16)
 // the input's raw boost flag is gated through nitro.tick each physics step
 const gatedInput = { throttle: 0, steer: 0, boost: false, roll: 0 }
 
@@ -95,7 +97,7 @@ if (import.meta.env.DEV) {
 }
 input.attach()
 
-createTuningPanel({
+const gui = createTuningPanel({
   waves,
   onWavesChanged: () => ocean.updateWaves(waves),
   vessel: vessel.tuning,
@@ -114,6 +116,9 @@ createTuningPanel({
   nitro: nitro.tuning,
   audio: audio.tuning,
 })
+if (touch !== null) {
+  gui.hide() // the panel covers a phone screen; tuning is a desktop activity
+}
 
 ragdoll.reset(vessel)
 
@@ -147,10 +152,10 @@ function frame(now: number) {
 
   while (accumulator >= STEP) {
     simTime += STEP
-    gatedInput.throttle = input.state.throttle
-    gatedInput.steer = input.state.steer
-    gatedInput.roll = input.state.roll ?? 0
-    gatedInput.boost = nitro.tick(STEP, input.state.boost === true)
+    gatedInput.throttle = THREE.MathUtils.clamp(input.state.throttle + (touch?.state.throttle ?? 0), -1, 1)
+    gatedInput.steer = THREE.MathUtils.clamp(input.state.steer + (touch?.state.steer ?? 0), -1, 1)
+    gatedInput.roll = THREE.MathUtils.clamp((input.state.roll ?? 0) + (touch?.state.roll ?? 0), -1, 1)
+    gatedInput.boost = nitro.tick(STEP, input.state.boost === true || touch?.state.boost === true)
     frameBoosting = frameBoosting || gatedInput.boost
     vessel.update(STEP, gatedInput, sampler)
     ragdoll.update(STEP, vessel, sampler, splash)
@@ -186,7 +191,7 @@ function frame(now: number) {
   if (pendingTakeoff) {
     audio.tookOff()
   }
-  audio.update(dt, vessel, frameBoosting, Math.max(input.state.throttle, 0))
+  audio.update(dt, vessel, frameBoosting, Math.max(gatedInput.throttle, 0))
   pendingLanding = 0
   pendingTakeoff = false
   chase.update(dt, vessel)

@@ -332,20 +332,21 @@ export class AudioSystem {
   private sfx: Sfx | null = null
   private wasBoosting = false
 
-  /** Call once; arms a one-time gesture listener that boots the audio graph. */
+  /** Call once; the first key press OR touch boots the audio graph (browser gesture rule). */
   attach() {
-    window.addEventListener(
-      'keydown',
-      () => {
-        this.ctx = new AudioContext()
-        this.master = this.ctx.createGain()
-        this.master.connect(this.ctx.destination)
-        this.voice = new EngineVoice(this.ctx, this.master)
-        this.water = new WaterAmbience(this.ctx, this.master)
-        this.sfx = new Sfx(this.ctx, this.master)
-      },
-      { once: true },
-    )
+    const init = () => {
+      if (this.ctx !== null) {
+        return
+      }
+      this.ctx = new AudioContext()
+      this.master = this.ctx.createGain()
+      this.master.connect(this.ctx.destination)
+      this.voice = new EngineVoice(this.ctx, this.master)
+      this.water = new WaterAmbience(this.ctx, this.master)
+      this.sfx = new Sfx(this.ctx, this.master)
+    }
+    window.addEventListener('keydown', init, { once: true })
+    window.addEventListener('pointerdown', init, { once: true })
   }
 
   update(dt: number, vessel: Vessel, boosting: boolean, throttle: number) {
