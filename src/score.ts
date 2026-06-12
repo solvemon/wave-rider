@@ -17,6 +17,7 @@ const NAME_POOLS: Record<BonusKind, string[]> = {
 
 export interface ScoreTuning {
   airRate: number // points per second of airtime
+  airBigBonus: number // quadratic term — big jumps pay disproportionately more
   snorkelRate: number // points per full second head-under
   smackFactor: number
   headFactor: number
@@ -30,6 +31,7 @@ export interface ScoreTuning {
 // slams score. Airtime outvalues passive smacks on purpose.
 export const defaultScoreTuning: ScoreTuning = {
   airRate: 30,
+  airBigBonus: 40,
   snorkelRate: 25,
   smackFactor: 12,
   headFactor: 18,
@@ -40,6 +42,7 @@ export const defaultScoreTuning: ScoreTuning = {
 
 const MIN_AIR_SECONDS = 0.5
 const SMACK_COOLDOWN = 0.25
+const SMACK_WINDOW = 2 // smacks only score in the seconds after a real jump landing
 
 /** Pure scoring logic — no DOM, deterministic via the injected RNG. */
 export class ScoreState {
@@ -51,6 +54,7 @@ export class ScoreState {
   private snorkelSeconds = 0
   private smackCooldown = 0
   private suppressTimer = 0
+  private smackWindow = 0
   private readonly queue: Bonus[] = []
 
   constructor(private readonly random: () => number = Math.random) {}
@@ -69,6 +73,7 @@ export class ScoreState {
 
     this.smackCooldown = Math.max(0, this.smackCooldown - dt)
     this.suppressTimer = Math.max(0, this.suppressTimer - dt)
+    this.smackWindow = Math.max(0, this.smackWindow - dt)
     if (vesselAirborne) {
       this.airSeconds += dt
     }
@@ -84,17 +89,28 @@ export class ScoreState {
     }
   }
 
-  /** Call when the vessel touches down — pays out accumulated airtime. */
+  /**
+   * Call when the vessel touches down — pays out accumulated airtime
+   * (quadratic in duration: big jumps pay disproportionately) and opens
+   * the window in which ragdoll smacks count as stunt damage.
+   */
   landed() {
 
     if (this.airSeconds >= MIN_AIR_SECONDS) {
-      this.award('airtime', Math.round(this.airSeconds * this.tuning.airRate))
+      const t = this.airSeconds
+      this.award('airtime', Math.round(t * this.tuning.airRate + t * t * this.tuning.airBigBonus))
+      this.smackWindow = SMACK_WINDOW
     }
     this.airSeconds = 0
   }
 
   deckImpact(force: number, head: boolean) {
 
+    // smacks only count in a jump's aftermath — idle wave heave bumps the
+    // doll against the hull constantly and must never score
+    if (this.smackWindow <= 0) {
+      return
+    }
     if (force < this.tuning.smackThreshold || this.smackCooldown > 0 || this.suppressTimer > 0) {
       return
     }

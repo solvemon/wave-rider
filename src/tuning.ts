@@ -103,6 +103,8 @@ export function createTuningPanel(targets: TuningTargets): GUI {
   vesselMesh.add(targets.vesselMesh, 'rotY', -Math.PI, Math.PI, 0.01).onChange(targets.onVesselMeshChanged)
 
   const scoreFolder = gui.addFolder('Score')
+  scoreFolder.add(targets.score, 'airRate', 5, 100, 1)
+  scoreFolder.add(targets.score, 'airBigBonus', 0, 150, 1)
   scoreFolder.add(targets.score, 'smackThreshold', 1, 8, 0.1)
   scoreFolder.add(targets.score, 'megaThreshold', 3, 15, 0.1)
   scoreFolder.add(targets.scoreFx, 'shake', 0, 0.2, 0.005).name('shakeScale')
