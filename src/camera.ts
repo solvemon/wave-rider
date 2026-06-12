@@ -26,11 +26,17 @@ export class ChaseCamera {
   private readonly lookPoint = new THREE.Vector3()
   private readonly lookTarget = new THREE.Vector3()
   private initialized = false
+  private shakeEnergy = 0
 
   constructor(
     readonly camera: THREE.PerspectiveCamera,
     public tuning: CameraTuning = { ...defaultCameraTuning },
   ) {}
+
+  /** Kick the camera; energy decays exponentially. */
+  shake(amount: number) {
+    this.shakeEnergy = Math.min(this.shakeEnergy + amount, 0.8)
+  }
 
   update(dt: number, vessel: Vessel) {
 
@@ -66,5 +72,11 @@ export class ChaseCamera {
     const targetFov = t.fovBase + Math.min(Math.abs(vessel.speed) * t.fovSpeedFactor, 25)
     this.camera.fov += (targetFov - this.camera.fov) * posAlpha
     this.camera.updateProjectionMatrix()
+
+    if (this.shakeEnergy > 0.001) {
+      this.camera.position.x += (Math.random() - 0.5) * this.shakeEnergy
+      this.camera.position.y += (Math.random() - 0.5) * this.shakeEnergy
+      this.shakeEnergy *= Math.exp(-7 * dt)
+    }
   }
 }

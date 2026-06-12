@@ -7,6 +7,7 @@ import { Sky } from './sky'
 import { Wake } from './wake'
 import { Splash } from './splash'
 import { Ragdoll } from './ragdoll'
+import { ScoreState, ScoreOverlay } from './score'
 import { createTuningPanel } from './tuning'
 
 const STEP = 1 / 60
@@ -58,6 +59,10 @@ window.addEventListener('keydown', (e) => {
   }
 })
 
+const score = new ScoreState()
+const overlay = new ScoreOverlay(document.body)
+const scoreFx = { shake: 0.05 }
+
 const chase = new ChaseCamera(camera)
 const input = new KeyboardInput()
 input.attach()
@@ -74,6 +79,8 @@ createTuningPanel({
   wake: wake.tuning,
   splash: splash.tuning,
   ragdoll: ragdoll.tuning,
+  score: score.tuning,
+  scoreFx,
 })
 
 ragdoll.reset(vessel)
@@ -93,6 +100,10 @@ let accumulator = 0
 // fixed steps of a frame so a multi-step frame can't drop one.
 let pendingLanding = 0
 let pendingTakeoff = false
+let pendingImpactForce = 0
+const lastImpactPoint = new THREE.Vector3()
+const popupWorld = new THREE.Vector3()
+const popupProjected = new THREE.Vector3()
 
 function frame(now: number) {
 
@@ -106,6 +117,18 @@ function frame(now: number) {
     ragdoll.update(STEP, vessel, sampler, splash)
     pendingLanding = Math.max(pendingLanding, vessel.justLanded)
     pendingTakeoff = pendingTakeoff || vessel.justTookOff
+    const headSubmerged = ragdoll.headPos.y < sampler(ragdoll.headPos.x, ragdoll.headPos.z)
+    score.tick(STEP, vessel.airborne, headSubmerged)
+    if (vessel.justLanded > 0) {
+      score.landed()
+    }
+    if (ragdoll.deckImpact) {
+      score.deckImpact(ragdoll.deckImpact.force, ragdoll.deckImpact.head)
+      if (ragdoll.deckImpact.force > pendingImpactForce) {
+        pendingImpactForce = ragdoll.deckImpact.force
+        lastImpactPoint.copy(ragdoll.deckImpact.point)
+      }
+    }
     accumulator -= STEP
   }
 
@@ -118,6 +141,32 @@ function frame(now: number) {
   chase.update(dt, vessel)
   sky.update(camera)
   renderer.render(scene, camera)
+
+  if (pendingImpactForce >= score.tuning.smackThreshold) {
+    splash.burst(lastImpactPoint, Math.min(Math.round(pendingImpactForce * 4), 40), Math.min(pendingImpactForce, 6))
+    chase.shake(Math.min(pendingImpactForce * scoreFx.shake, 0.5))
+  }
+  pendingImpactForce = 0
+
+  for (const bonus of score.drain()) {
+    if (bonus.kind === 'snorkel') {
+      popupWorld.copy(ragdoll.headPos)
+    } else if (bonus.kind === 'airtime') {
+      popupWorld.copy(vessel.position)
+    } else {
+      popupWorld.copy(lastImpactPoint)
+    }
+    popupWorld.y += 1
+    popupProjected.copy(popupWorld).project(camera)
+    overlay.popup(
+      `${bonus.name} +${bonus.points}`,
+      (popupProjected.x * 0.5 + 0.5) * window.innerWidth,
+      (-popupProjected.y * 0.5 + 0.5) * window.innerHeight,
+      bonus.kind === 'megaSmack',
+    )
+  }
+  overlay.setTotal(score.total)
+
   requestAnimationFrame(frame)
 }
 

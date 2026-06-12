@@ -5,6 +5,7 @@ import type { CameraTuning } from './camera'
 import type { WakeTuning } from './wake'
 import type { SplashTuning } from './splash'
 import type { RagdollTuning } from './ragdoll'
+import type { ScoreTuning } from './score'
 
 export interface TuningTargets {
   waves: WaveParams[]
@@ -18,6 +19,8 @@ export interface TuningTargets {
   wake: WakeTuning
   splash: SplashTuning
   ragdoll: RagdollTuning
+  score: ScoreTuning
+  scoreFx: { shake: number }
 }
 
 /** Builds the live tuning panel. Press H to show/hide. */
@@ -87,6 +90,11 @@ export function createTuningPanel(targets: TuningTargets): GUI {
   rag.add(targets.ragdoll, 'gravity', 4, 30, 0.5)
   rag.add(targets.ragdoll, 'damping', 0.9, 0.999, 0.001)
   rag.add(targets.ragdoll, 'waterDrag', 0, 15, 0.25)
+
+  const scoreFolder = gui.addFolder('Score')
+  scoreFolder.add(targets.score, 'smackThreshold', 1, 8, 0.1)
+  scoreFolder.add(targets.score, 'megaThreshold', 3, 15, 0.1)
+  scoreFolder.add(targets.scoreFx, 'shake', 0, 0.2, 0.005).name('shakeScale')
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyH') {
