@@ -64,14 +64,21 @@ function makeDriveCurve(amount: number) {
 
 const SMOOTH = 0.04 // setTargetAtTime time constant — kills zipper noise
 
-/** Arcade engine voice: harmonics + hiss through grit and a fixed-range body filter. */
+/**
+ * Engine voice v2 — combustion-first. A real engine is mostly PULSED NOISE
+ * (exhaust bursts at the firing rate), not tones: broadband noise is
+ * amplitude-gated at the firing frequency, run through grit and two fixed
+ * "exhaust pipe" resonators. Light oscillator support underneath, and a
+ * per-frame pitch wobble so no two cycles are identical (perfect
+ * periodicity is what reads as "NES synth").
+ */
 class EngineVoice {
-  private readonly saw: OscillatorNode
-  private readonly square: OscillatorNode
+  private readonly fireOsc: OscillatorNode // gates the combustion noise
   private readonly sub: OscillatorNode
+  private readonly saw: OscillatorNode
+  private readonly saw2: OscillatorNode
   private readonly boostSaw: OscillatorNode
   private readonly boostGain: GainNode
-  private readonly noiseGain: GainNode
   private readonly shaper: WaveShaperNode
   private readonly body: BiquadFilterNode
   private readonly gain: GainNode
@@ -84,31 +91,61 @@ class EngineVoice {
 
     this.body = ctx.createBiquadFilter()
     this.body.type = 'lowpass'
-    this.body.frequency.value = 900
-    this.body.Q.value = 0.8
+    this.body.frequency.value = 800
+    this.body.Q.value = 0.7
     this.body.connect(this.gain)
 
+    // fixed exhaust-pipe resonances — these stay put while rpm moves,
+    // which is what gives the sound a consistent mechanical "body"
+    const pipe1 = this.ctx.createBiquadFilter()
+    pipe1.type = 'peaking'
+    pipe1.frequency.value = 190
+    pipe1.Q.value = 2
+    pipe1.gain.value = 7
+    const pipe2 = this.ctx.createBiquadFilter()
+    pipe2.type = 'peaking'
+    pipe2.frequency.value = 680
+    pipe2.Q.value = 3
+    pipe2.gain.value = 4
+    pipe1.connect(pipe2).connect(this.body)
+
     this.shaper = ctx.createWaveShaper()
-    this.shaper.curve = makeDriveCurve(2.2)
-    this.shaper.connect(this.body)
+    this.shaper.curve = makeDriveCurve(2.8)
+    this.shaper.connect(pipe1)
+
+    // combustion core: noise gated at the firing rate (audio-rate AM)
+    const noise = ctx.createBufferSource()
+    noise.buffer = makeNoiseBuffer(ctx)
+    noise.loop = true
+    const noiseColor = ctx.createBiquadFilter()
+    noiseColor.type = 'lowpass'
+    noiseColor.frequency.value = 2200
+    const pulseGate = ctx.createGain()
+    pulseGate.gain.value = 0.45 // base; fireOsc swings it 0..0.9
+    this.fireOsc = ctx.createOscillator()
+    this.fireOsc.type = 'square'
+    const pulseDepth = ctx.createGain()
+    pulseDepth.gain.value = 0.45
+    this.fireOsc.connect(pulseDepth).connect(pulseGate.gain)
+    noise.connect(noiseColor).connect(pulseGate).connect(this.shaper)
+
+    // light tonal support under the combustion
+    this.sub = ctx.createOscillator()
+    this.sub.type = 'sine'
+    const subGain = ctx.createGain()
+    subGain.gain.value = 0.4
+    this.sub.connect(subGain).connect(this.shaper)
 
     this.saw = ctx.createOscillator()
     this.saw.type = 'sawtooth'
-    this.square = ctx.createOscillator()
-    this.square.type = 'square'
-    this.square.detune.value = 6
-    this.sub = ctx.createOscillator()
-    this.sub.type = 'sine'
-
+    this.saw2 = ctx.createOscillator()
+    this.saw2.type = 'sawtooth'
     const sawGain = ctx.createGain()
-    sawGain.gain.value = 0.5
-    const squareGain = ctx.createGain()
-    squareGain.gain.value = 0.18
-    const subGain = ctx.createGain()
-    subGain.gain.value = 0.45
+    sawGain.gain.value = 0.09 // support, not lead — the beating between the
+    const sawGain2 = ctx.createGain() // two detuned saws reads as uneven cylinders
+    sawGain2.gain.value = 0.09
     this.saw.connect(sawGain).connect(this.shaper)
-    this.square.connect(squareGain).connect(this.shaper)
-    this.sub.connect(subGain).connect(this.shaper)
+    this.saw2.connect(sawGain2).connect(this.shaper)
 
     // nitro layer: hot detuned saw, silent until boosting
     this.boostSaw = ctx.createOscillator()
@@ -118,20 +155,10 @@ class EngineVoice {
     this.boostGain.gain.value = 0
     this.boostSaw.connect(this.boostGain).connect(this.shaper)
 
-    const noise = ctx.createBufferSource()
-    noise.buffer = makeNoiseBuffer(ctx)
-    noise.loop = true
-    const noiseFilter = ctx.createBiquadFilter()
-    noiseFilter.type = 'bandpass'
-    noiseFilter.frequency.value = 1400
-    noiseFilter.Q.value = 0.6
-    this.noiseGain = ctx.createGain()
-    this.noiseGain.gain.value = 0
-    noise.connect(noiseFilter).connect(this.noiseGain).connect(this.body)
-
-    this.saw.start()
-    this.square.start()
+    this.fireOsc.start()
     this.sub.start()
+    this.saw.start()
+    this.saw2.start()
     this.boostSaw.start()
     noise.start()
   }
@@ -139,16 +166,20 @@ class EngineVoice {
   update(rpm: number, boosting: boolean, volume: number) {
 
     const t = this.ctx.currentTime
-    const f = 45 + rpm * 110
 
-    this.saw.frequency.setTargetAtTime(f, t, SMOOTH)
-    this.square.frequency.setTargetAtTime(f * 2, t, SMOOTH)
-    this.sub.frequency.setTargetAtTime(f * 0.5, t, SMOOTH)
-    this.boostSaw.frequency.setTargetAtTime(f * 1.5, t, SMOOTH)
-    this.boostGain.gain.setTargetAtTime(boosting ? 0.4 : 0, t, SMOOTH)
-    this.noiseGain.gain.setTargetAtTime(0.05 + rpm * 0.18, t, SMOOTH)
-    this.body.frequency.setTargetAtTime(900 + rpm * 1800, t, SMOOTH)
-    this.gain.gain.setTargetAtTime((0.12 + rpm * 0.2) * volume, t, SMOOTH)
+    // per-frame random wobble, smoothed into a lope by setTargetAtTime —
+    // cycle-to-cycle irregularity is what separates "motor" from "synth"
+    const wobble = (Math.random() - 0.5) * (1.2 + rpm * 2.5)
+    const f = 28 + rpm * 72 + wobble
+
+    this.fireOsc.frequency.setTargetAtTime(f, t, SMOOTH)
+    this.sub.frequency.setTargetAtTime(f, t, SMOOTH)
+    this.saw.frequency.setTargetAtTime(f * 2, t, SMOOTH)
+    this.saw2.frequency.setTargetAtTime(f * 2 * 1.013, t, SMOOTH)
+    this.boostSaw.frequency.setTargetAtTime(f * 3, t, SMOOTH)
+    this.boostGain.gain.setTargetAtTime(boosting ? 0.35 : 0, t, SMOOTH)
+    this.body.frequency.setTargetAtTime(800 + rpm * 1500, t, SMOOTH)
+    this.gain.gain.setTargetAtTime((0.16 + rpm * 0.22) * volume, t, SMOOTH)
   }
 }
 
