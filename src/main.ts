@@ -33,7 +33,7 @@ const applySun = () => {
 applySun()
 
 const waves = defaultWaves.map((w) => ({ ...w }))
-const ocean = new Ocean(waves)
+const ocean = new Ocean(waves, sky.sunDir, sky.horizonColor)
 scene.add(ocean.mesh)
 
 const vessel = new Vessel()

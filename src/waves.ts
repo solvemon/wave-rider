@@ -83,7 +83,10 @@ export function surfaceHeight(waves: WaveParams[], x: number, z: number, t: numb
 
 /**
  * GLSL twin of gerstnerDisplace(). Prepended to the ocean vertex shader.
- * MUST stay line-for-line equivalent to the TypeScript function above.
+ * The DISPLACEMENT lines MUST stay line-for-line equivalent to the
+ * TypeScript function above — physics and visuals share that math. The
+ * normal and crest accumulation are GPU-only visual extras; the CPU never
+ * needs them, so the equivalence invariant covers displacement only.
  *
  * Known limitation: phase is computed in float32 on the GPU from absolute uTime,
  * so visual precision degrades over very long sessions (~hours) and live
@@ -97,8 +100,12 @@ uniform vec4 uWaveA[NUM_WAVES]; // dirX, dirZ, amplitude, wavelength
 uniform vec2 uWaveB[NUM_WAVES]; // steepness, speed
 uniform float uTime;
 
-vec3 gerstnerDisplace(vec2 p) {
-  vec3 disp = vec3(0.0);
+// crest = horizontal compression (peaks where Gerstner crests sharpen),
+// used by the fragment shader as the foam mask. Range ≈ ±(mean steepness).
+void gerstnerSurface(vec2 p, out vec3 disp, out vec3 normal, out float crest) {
+  disp = vec3(0.0);
+  vec3 n = vec3(0.0, 1.0, 0.0);
+  crest = 0.0;
   for (int i = 0; i < NUM_WAVES; i++) {
     float k = 6.28318530718 / uWaveA[i].w;
     vec2 d = uWaveA[i].xy;
@@ -106,10 +113,24 @@ vec3 gerstnerDisplace(vec2 p) {
     float q = uWaveB[i].x / (k * max(a, 0.001) * float(NUM_WAVES));
     float phase = k * dot(d, p) - k * uWaveB[i].y * uTime;
     float c = cos(phase);
+    float s = sin(phase);
     disp.x += q * a * d.x * c;
-    disp.y += a * sin(phase);
+    disp.y += a * s;
     disp.z += q * a * d.y * c;
+    float ka = k * a;
+    n.x -= d.x * ka * c;
+    n.z -= d.y * ka * c;
+    n.y -= q * ka * s;
+    crest += q * ka * s;
   }
+  normal = normalize(n);
+}
+
+vec3 gerstnerDisplace(vec2 p) {
+  vec3 disp;
+  vec3 n;
+  float crest;
+  gerstnerSurface(p, disp, n, crest);
   return disp;
 }
 `

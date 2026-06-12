@@ -6,36 +6,74 @@ const SEGMENTS = 512
 
 const vertexShader = gerstnerGLSL + /* glsl */ `
 varying vec3 vWorldPos;
+varying vec3 vNormal;
 varying float vHeight;
+varying float vCrest;
 
 void main() {
   vec4 worldPos = modelMatrix * vec4(position, 1.0);
-  vec3 disp = gerstnerDisplace(worldPos.xz);
+  vec3 disp;
+  vec3 normal;
+  float crest;
+  gerstnerSurface(worldPos.xz, disp, normal, crest);
   worldPos.xyz += disp;
   vWorldPos = worldPos.xyz;
+  vNormal = normal;
   vHeight = disp.y; // raw vertical Gerstner component, not the corrected surfaceHeight()
+  vCrest = crest;
   gl_Position = projectionMatrix * viewMatrix * worldPos;
 }
 `
 
 const fragmentShader = /* glsl */ `
+uniform vec3 uSunDir;
+uniform vec3 uHorizonColor;
+uniform float uFoamThreshold;
+uniform float uFoamIntensity;
+uniform float uTime;
 varying vec3 vWorldPos;
+varying vec3 vNormal;
 varying float vHeight;
+varying float vCrest;
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+             mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
 
 void main() {
   vec3 deep = vec3(0.04, 0.16, 0.27);
   vec3 shallow = vec3(0.12, 0.45, 0.52);
-  vec3 sky = vec3(0.65, 0.78, 0.85);
 
-  float h = clamp(vHeight * 0.25 + 0.5, 0.0, 1.0);
+  float h = clamp(vHeight * 0.15 + 0.5, 0.0, 1.0);
   vec3 col = mix(deep, shallow, h);
 
+  vec3 n = normalize(vNormal);
+  float diff = max(dot(n, uSunDir), 0.0);
+  col *= 0.55 + 0.45 * diff;
+
   vec3 viewDir = normalize(cameraPosition - vWorldPos);
+  vec3 halfDir = normalize(uSunDir + viewDir);
+  float spec = pow(max(dot(n, halfDir), 0.0), 120.0);
+  col += vec3(1.0, 0.92, 0.8) * spec * 0.9;
+
   float fresnel = pow(1.0 - max(viewDir.y, 0.0), 3.0);
-  col = mix(col, sky, fresnel * 0.6);
+  col = mix(col, uHorizonColor, fresnel * 0.5);
+
+  float breakup = noise(vWorldPos.xz * 0.9 + uTime * 0.25) * 0.6
+                + noise(vWorldPos.xz * 2.7 - uTime * 0.15) * 0.4;
+  float foam = smoothstep(uFoamThreshold, uFoamThreshold + 0.18, vCrest * (0.55 + 0.9 * breakup));
+  col = mix(col, vec3(0.96, 0.97, 0.94), foam * uFoamIntensity);
 
   float dist = length(vWorldPos.xz - cameraPosition.xz);
-  col = mix(col, sky, smoothstep(120.0, 190.0, dist));
+  col = mix(col, uHorizonColor, smoothstep(120.0, 190.0, dist));
 
   gl_FragColor = vec4(col, 1.0);
 }
@@ -43,9 +81,11 @@ void main() {
 
 export class Ocean {
   readonly mesh: THREE.Mesh
+  /** Live foam tuning — read into uniforms every frame. */
+  foam = { threshold: 0.22, intensity: 0.9 }
   private readonly material: THREE.ShaderMaterial
 
-  constructor(waves: WaveParams[]) {
+  constructor(waves: WaveParams[], sunDir: THREE.Vector3, horizonColor: THREE.Color) {
     const geometry = new THREE.PlaneGeometry(OCEAN_SIZE, OCEAN_SIZE, SEGMENTS, SEGMENTS)
     geometry.rotateX(-Math.PI / 2)
 
@@ -56,6 +96,11 @@ export class Ocean {
         uTime: { value: 0 },
         uWaveA: { value: Array.from({ length: NUM_WAVES }, () => new THREE.Vector4()) },
         uWaveB: { value: Array.from({ length: NUM_WAVES }, () => new THREE.Vector2()) },
+        // shared by reference with the Sky — GUI sun changes propagate freely
+        uSunDir: { value: sunDir },
+        uHorizonColor: { value: horizonColor },
+        uFoamThreshold: { value: this.foam.threshold },
+        uFoamIntensity: { value: this.foam.intensity },
       },
     })
 
@@ -80,6 +125,8 @@ export class Ocean {
    */
   update(time: number, center: THREE.Vector3) {
     this.material.uniforms.uTime.value = time
+    this.material.uniforms.uFoamThreshold.value = this.foam.threshold
+    this.material.uniforms.uFoamIntensity.value = this.foam.intensity
     const step = OCEAN_SIZE / SEGMENTS
     this.mesh.position.x = Math.round(center.x / step) * step
     this.mesh.position.z = Math.round(center.z / step) * step
