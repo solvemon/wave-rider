@@ -4,7 +4,9 @@ import type { Vessel } from './vessel'
 const MAX_SAMPLES = 96
 const SAMPLE_INTERVAL = 0.05
 const MIN_WAKE_SPEED = 4
-const STERN_OFFSET = 2
+const BOW_OFFSET = 2 // wake wedge apex sits at the bow
+const APEX_HALF_WIDTH = 0.3
+const MAX_HALF_WIDTH = 10
 
 export interface WakeSample {
   x: number
@@ -74,9 +76,10 @@ void main() {
 `
 
 /**
- * Stern wake: a triangle-strip ribbon over recent stern positions, widening
- * and fading with age, y-conformed to the wave surface each frame. Vertex
- * positions are world-space (mesh stays at the origin).
+ * Wake wedge: a triangle-strip ribbon over recent bow positions whose width
+ * grows with distance behind the boat (apex at the bow) and fades with age,
+ * y-conformed to the wave surface each frame. Vertex positions are
+ * world-space (mesh stays at the origin).
  */
 export class Wake {
   readonly mesh: THREE.Mesh
@@ -130,8 +133,8 @@ export class Wake {
     if (!vessel.airborne && Math.abs(vessel.speed) > MIN_WAKE_SPEED && this.sinceSample >= SAMPLE_INTERVAL) {
       this.sinceSample = 0
       this.samples.push({
-        x: vessel.position.x - Math.sin(vessel.yaw) * STERN_OFFSET,
-        z: vessel.position.z - Math.cos(vessel.yaw) * STERN_OFFSET,
+        x: vessel.position.x + Math.sin(vessel.yaw) * BOW_OFFSET,
+        z: vessel.position.z + Math.cos(vessel.yaw) * BOW_OFFSET,
         age: 0,
       })
       if (this.samples.length > MAX_SAMPLES) {
@@ -152,7 +155,10 @@ export class Wake {
       dz /= len
 
       const ageT = s.age / this.tuning.lifetime
-      const half = 0.35 + this.tuning.width * 0.5 * ageT
+      // Wedge shape: width grows with distance behind the boat (apex at the
+      // bow), like a real wake — tuning.width is the spread slope multiplier.
+      const distBehind = Math.hypot(s.x - vessel.position.x, s.z - vessel.position.z)
+      const half = Math.min(APEX_HALF_WIDTH + this.tuning.width * 0.12 * distBehind, MAX_HALF_WIDTH)
       const y = sampleHeight(s.x, s.z) + 0.06
       const alpha = Math.max(1 - ageT, 0) * 0.8
       const v = i * 2
