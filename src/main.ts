@@ -89,6 +89,11 @@ audio.attach()
 score.onBonus = (b) => audio.bonus(b)
 
 const chase = new ChaseCamera(camera)
+if (TouchControls.isTouchDevice()) {
+  // portrait screens show a narrow horizontal slice — pull the camera in so
+  // the jetski and the flailing rider stay readable on a phone
+  Object.assign(chase.tuning, { distance: 7.5, height: 3.4, fovBase: 58, fovSpeedFactor: 0.4, airPullback: 1.5 })
+}
 const input = new KeyboardInput()
 
 if (import.meta.env.DEV) {
