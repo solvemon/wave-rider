@@ -15,6 +15,13 @@ describe('gerstnerDisplace', () => {
       expect(Math.abs(out.y)).toBeLessThanOrEqual(maxAmplitude + 1e-9)
     }
   })
+
+  it('produces no horizontal displacement at zero steepness', () => {
+    const flat = defaultWaves.map((w) => ({ ...w, steepness: 0 }))
+    const out = gerstnerDisplace(flat, 12.3, -7.8, 4.2, { x: 0, y: 0, z: 0 })
+    expect(out.x).toBe(0)
+    expect(out.z).toBe(0)
+  })
 })
 
 describe('surfaceHeight', () => {
@@ -26,7 +33,7 @@ describe('surfaceHeight', () => {
     for (const [x0, z0] of [[3.7, -2.1], [-15.2, 8.9], [40.1, 33.3]]) {
       const d = gerstnerDisplace(defaultWaves, x0, z0, t, { x: 0, y: 0, z: 0 })
       const h = surfaceHeight(defaultWaves, x0 + d.x, z0 + d.z, t)
-      expect(h).toBeCloseTo(d.y, 1)
+      expect(h).toBeCloseTo(d.y, 2)
     }
   })
 })

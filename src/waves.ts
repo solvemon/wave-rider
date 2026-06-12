@@ -60,6 +60,10 @@ const tmp: Vec3 = { x: 0, y: 0, z: 0 }
  * displace horizontally, this inverts the horizontal displacement by fixed-
  * point iteration before reading the height — sharing height alone would let
  * the vessel drift off the visual surface.
+ *
+ * Converges when mean steepness is below 1 (the fixed-point map is a
+ * contraction with constant ≈ Σ steepness / N). The tuning panel caps
+ * steepness at 1 per wave, which keeps this safe.
  */
 export function surfaceHeight(waves: WaveParams[], x: number, z: number, t: number): number {
   let gx = x
@@ -71,6 +75,7 @@ export function surfaceHeight(waves: WaveParams[], x: number, z: number, t: numb
     gz = z - tmp.z
   }
 
+  // final sample at the converged grid point
   gerstnerDisplace(waves, gx, gz, t, tmp)
 
   return tmp.y
@@ -79,6 +84,12 @@ export function surfaceHeight(waves: WaveParams[], x: number, z: number, t: numb
 /**
  * GLSL twin of gerstnerDisplace(). Prepended to the ocean vertex shader.
  * MUST stay line-for-line equivalent to the TypeScript function above.
+ *
+ * Known limitation: phase is computed in float32 on the GPU from absolute uTime,
+ * so visual precision degrades over very long sessions (~hours) and live
+ * speed-slider changes cause a phase jump proportional to elapsed time.
+ * Acceptable for a feel prototype; a production version should upload per-wave
+ * phases accumulated in float64 on the CPU.
  */
 export const gerstnerGLSL = /* glsl */ `
 const int NUM_WAVES = ${NUM_WAVES};
