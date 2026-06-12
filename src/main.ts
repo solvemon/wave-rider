@@ -5,6 +5,7 @@ import { Vessel, KeyboardInput, createVesselMesh, syncVesselMesh } from './vesse
 import { ChaseCamera } from './camera'
 import { Sky } from './sky'
 import { Wake } from './wake'
+import { Splash } from './splash'
 import { createTuningPanel } from './tuning'
 
 const STEP = 1 / 60
@@ -44,6 +45,9 @@ scene.add(vesselMesh)
 const wake = new Wake()
 scene.add(wake.mesh)
 
+const splash = new Splash()
+scene.add(splash.points)
+
 const chase = new ChaseCamera(camera)
 const input = new KeyboardInput()
 input.attach()
@@ -66,6 +70,10 @@ window.addEventListener('resize', () => {
 
 let last = performance.now()
 let accumulator = 0
+// Landing/takeoff events are per-physics-step; accumulate them across the
+// fixed steps of a frame so a multi-step frame can't drop one.
+let pendingLanding = 0
+let pendingTakeoff = false
 
 function frame(now: number) {
 
@@ -76,12 +84,17 @@ function frame(now: number) {
   while (accumulator >= STEP) {
     simTime += STEP
     vessel.update(STEP, input.state, sampler)
+    pendingLanding = Math.max(pendingLanding, vessel.justLanded)
+    pendingTakeoff = pendingTakeoff || vessel.justTookOff
     accumulator -= STEP
   }
 
   syncVesselMesh(vessel, vesselMesh)
   ocean.update(simTime, vessel.position)
   wake.update(dt, simTime, vessel, sampler)
+  splash.update(dt, vessel, pendingLanding, pendingTakeoff)
+  pendingLanding = 0
+  pendingTakeoff = false
   chase.update(dt, vessel)
   sky.update(camera)
   renderer.render(scene, camera)
