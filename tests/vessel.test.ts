@@ -123,6 +123,32 @@ describe('Vessel', () => {
     expect(vessel.position.y).toBeLessThan(0.2) // lift must never overcome gravity
   })
 
+  it('completes barrel rolls in the air and keeps the roll angle wrapped', () => {
+    const vessel = new Vessel()
+    let rolls = 0
+    for (let i = 0; i < 180; i++) { // 3 s over a void, holding E
+      vessel.update(STEP, { throttle: 0, steer: 0, roll: 1 }, () => -100)
+      if (vessel.justBarrelRolled) {
+        rolls++
+      }
+    }
+    expect(rolls).toBeGreaterThanOrEqual(1)
+    expect(Math.abs(vessel.roll)).toBeLessThan(Math.PI * 2)
+  })
+
+  it('ignores roll input on the water', () => {
+    const vessel = new Vessel()
+    vessel.position.y = -0.3
+    let rolls = 0
+    for (let i = 0; i < 180; i++) {
+      vessel.update(STEP, { throttle: 1, steer: 0, roll: 1 }, flatWater)
+      if (vessel.justBarrelRolled) {
+        rolls++
+      }
+    }
+    expect(rolls).toBe(0)
+  })
+
   it('lands without exploding after a long drop', () => {
     const vessel = new Vessel()
     vessel.position.y = 6

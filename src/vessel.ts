@@ -5,6 +5,7 @@ export interface VesselInput {
   throttle: number // -1..1, W = +1
   steer: number // -1..1, D = +1 (right)
   boost?: boolean // nitro — gated by charge in main, vessel just applies thrust
+  roll?: number // -1..1, Q = -1 (left) / E = +1 (right) — air barrel rolls
 }
 
 export type SurfaceSampler = (x: number, z: number) => number
@@ -28,6 +29,7 @@ export interface VesselTuning {
   autoLevelSpring: number // air: pulls pitch/roll toward level
   autoLevelDamping: number
   airPitchAuthority: number // radians of pitch target at full stick
+  rollRate: number // rad/s of commanded air roll (4.5 ≈ one barrel roll per 1.4 s)
   landingAbsorb: number // 0..1 share of downward speed removed on touchdown
   speedKeptOnLanding: number // 0..1 share of forward speed kept on touchdown
 }
@@ -51,6 +53,7 @@ export const defaultTuning: VesselTuning = {
   autoLevelSpring: 8,
   autoLevelDamping: 4,
   airPitchAuthority: 0.35,
+  rollRate: 4.5,
   landingAbsorb: 0.6,
   speedKeptOnLanding: 0.85,
 }
@@ -73,6 +76,8 @@ export class Vessel {
   airborne = false
   justTookOff = false // true only on the step the hull left the water
   justLanded = 0 // downward impact speed (m/s) on the touchdown step, else 0
+  justBarrelRolled = false // true only on the step a full 360° air roll completed
+  private airRollAccum = 0
 
   constructor(public tuning: VesselTuning = { ...defaultTuning }) {}
 
@@ -85,6 +90,7 @@ export class Vessel {
 
     this.justTookOff = false
     this.justLanded = 0
+    this.justBarrelRolled = false
 
     const t = this.tuning
     const sinYaw = Math.sin(this.yaw)
@@ -112,10 +118,30 @@ export class Vessel {
 
       const airPitchTarget = input.throttle * t.airPitchAuthority
       this.pitchVel += (t.autoLevelSpring * (airPitchTarget - this.pitch) - t.autoLevelDamping * this.pitchVel) * dt
-      this.rollVel += (t.autoLevelSpring * -this.roll - t.autoLevelDamping * this.rollVel) * dt
+
+      const rollInput = input.roll ?? 0
+      if (rollInput !== 0) {
+        // barrel roll: converge to the commanded roll rate, auto-level suspended
+        this.rollVel += (rollInput * t.rollRate - this.rollVel) * Math.min(12 * dt, 1)
+      } else {
+        this.rollVel += (t.autoLevelSpring * -this.roll - t.autoLevelDamping * this.rollVel) * dt
+      }
+
+      // count full rotations; re-wrap the angle so the auto-level spring
+      // sees "level" instead of unwinding a completed roll backwards
+      this.airRollAccum += this.rollVel * dt
+      if (Math.abs(this.airRollAccum) >= Math.PI * 2) {
+        this.justBarrelRolled = true
+        const dir = Math.sign(this.airRollAccum)
+        this.airRollAccum -= dir * Math.PI * 2
+        this.roll -= dir * Math.PI * 2
+      }
     } else {
       if (wasAirborne) {
         this.justLanded = Math.max(0, -this.vy)
+        this.airRollAccum = 0
+        // recover from any partial roll the short way
+        this.roll = Math.atan2(Math.sin(this.roll), Math.cos(this.roll))
         if (this.vy < 0) {
           this.vy *= 1 - t.landingAbsorb
         }
@@ -265,5 +291,6 @@ export class KeyboardInput {
     this.state.steer =
       (p.has('KeyD') || p.has('ArrowRight') ? 1 : 0) - (p.has('KeyA') || p.has('ArrowLeft') ? 1 : 0)
     this.state.boost = p.has('Space')
+    this.state.roll = (p.has('KeyE') ? 1 : 0) - (p.has('KeyQ') ? 1 : 0)
   }
 }
