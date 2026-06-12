@@ -124,6 +124,7 @@ export function createTuningPanel(targets: TuningTargets): GUI {
   const audioFolder = gui.addFolder('Audio')
   audioFolder.add(targets.audio, 'master', 0, 1, 0.01)
   audioFolder.add(targets.audio, 'engine', 0, 1, 0.01)
+  audioFolder.add(targets.audio, 'music', 0, 1, 0.01)
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyH') {

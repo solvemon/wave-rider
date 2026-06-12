@@ -56,6 +56,9 @@ screams unloaded in the air, and bogs down on landings; nitro adds an
 angry detuned layer. Audio starts on your first keypress (browser rule).
 Volumes are in the panel's Audio folder.
 
+Soundtrack: `public/sfx/music.mp3` loops as background music
+("Positive Fuse" by French Fuse). Volume in the Audio folder.
+
 One-shot sample slots: drop files in `public/sfx/` named `bonus`,
 `big-bonus`, `splash`, `takeoff` or `nitro` (`.ogg`, `.mp3` or `.wav`)
 and they play automatically at the right moments. Missing files are

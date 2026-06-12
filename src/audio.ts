@@ -4,9 +4,10 @@ import type { Bonus } from './score'
 export interface AudioTuning {
   master: number
   engine: number
+  music: number
 }
 
-export const defaultAudioTuning: AudioTuning = { master: 0.5, engine: 0.5 }
+export const defaultAudioTuning: AudioTuning = { master: 0.5, engine: 0.5, music: 0.4 }
 
 const IDLE_RPM = 0.15
 const SPOOL_RATE = 4 // 1/s — how fast rpm chases its target
@@ -330,6 +331,7 @@ export class AudioSystem {
   private voice: EngineVoice | null = null
   private water: WaterAmbience | null = null
   private sfx: Sfx | null = null
+  private musicGain: GainNode | null = null
   private wasBoosting = false
 
   /** Call once; the first key press OR touch boots the audio graph (browser gesture rule). */
@@ -344,6 +346,14 @@ export class AudioSystem {
       this.voice = new EngineVoice(this.ctx, this.master)
       this.water = new WaterAmbience(this.ctx, this.master)
       this.sfx = new Sfx(this.ctx, this.master)
+
+      // soundtrack: streamed (not decoded into memory), looping, own volume
+      const music = new Audio(`${import.meta.env.BASE_URL}sfx/music.mp3`)
+      music.loop = true
+      this.musicGain = this.ctx.createGain()
+      this.musicGain.gain.value = this.tuning.music
+      this.ctx.createMediaElementSource(music).connect(this.musicGain).connect(this.master)
+      music.play().catch(() => {}) // missing file or codec issue → silent, like the sfx slots
     }
     window.addEventListener('keydown', init, { once: true })
     window.addEventListener('pointerdown', init, { once: true })
@@ -357,6 +367,7 @@ export class AudioSystem {
     }
 
     this.master.gain.setTargetAtTime(this.tuning.master, this.ctx.currentTime, 0.05)
+    this.musicGain?.gain.setTargetAtTime(this.tuning.music, this.ctx.currentTime, 0.05)
     this.voice?.update(rpm, boosting, this.tuning.engine)
     this.water?.update(vessel.speed, vessel.airborne)
 
