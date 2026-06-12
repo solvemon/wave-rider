@@ -22,6 +22,7 @@ type-checks and bundles.
 | S / ↓ | Reverse / brake (nose-down in the air) |
 | A / D | Steer |
 | H | Show/hide the tuning panel |
+| R | Reset the ragdoll rider onto the deck |
 
 ## Playtesting — what to look for
 

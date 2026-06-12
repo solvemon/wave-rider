@@ -25,6 +25,12 @@ const SPLASH_INTERVAL = 0.125 // ≤ 8 bursts/s so the doll can't drain the pool
 const MOUNT_L = new THREE.Vector3(-0.35, 0.5 + VISUAL_FLOAT_OFFSET, 1.5)
 const MOUNT_R = new THREE.Vector3(0.35, 0.5 + VISUAL_FLOAT_OFFSET, 1.5)
 const UP = new THREE.Vector3(0, 1, 0)
+// hull-local deck plane (top of the rendered hull) the body rests on
+const DECK_Y = 0.4 + VISUAL_FLOAT_OFFSET
+const DECK_HALF_WIDTH = 1.0
+const DECK_HALF_LENGTH = 2.1
+const DECK_SNAP_RANGE = 0.8 // only snap particles near the deck, not ones dangling far below
+const DECK_FRICTION = 5
 
 export interface RagdollTuning {
   gravity: number
@@ -106,6 +112,7 @@ export class Ragdoll {
   private readonly mountL = new THREE.Vector3()
   private readonly mountR = new THREE.Vector3()
   private readonly orientation = new THREE.Quaternion()
+  private readonly invOrientation = new THREE.Quaternion()
   private readonly euler = new THREE.Euler(0, 0, 0, 'YXZ')
   private readonly tmp = new THREE.Vector3()
   private readonly shoulderMid = new THREE.Vector3() // placeBone reuses tmp — keep these distinct
@@ -119,7 +126,7 @@ export class Ragdoll {
 
     const wetsuit = new THREE.MeshStandardMaterial({ color: 0xffd54f })
     for (const [a, b] of LIMB_BONES) {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.11, 1, 0.11), wetsuit)
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1, 0.14), wetsuit)
       this.limbMeshes.push({ mesh, a, b })
       this.group.add(mesh)
     }
@@ -128,7 +135,7 @@ export class Ragdoll {
     this.group.add(this.torsoMesh)
 
     this.headMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.22, 0.22, 0.22),
+      new THREE.BoxGeometry(0.26, 0.26, 0.26),
       new THREE.MeshStandardMaterial({ color: 0xfafafa }),
     )
     this.group.add(this.headMesh)
@@ -204,6 +211,23 @@ export class Ragdoll {
     this.particles[HAND_L].pos.copy(this.mountL)
     this.particles[HAND_R].pos.copy(this.mountR)
 
+    // deck collision: rest on the hull top instead of falling through it
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      if (i === HAND_L || i === HAND_R) {
+        continue
+      }
+      const p = this.particles[i]
+      this.tmp.copy(p.pos).sub(vessel.position).applyQuaternion(this.invOrientation)
+      const onFootprint = Math.abs(this.tmp.x) < DECK_HALF_WIDTH && Math.abs(this.tmp.z) < DECK_HALF_LENGTH
+      if (onFootprint && this.tmp.y < DECK_Y && this.tmp.y > DECK_Y - DECK_SNAP_RANGE) {
+        this.tmp.y = DECK_Y
+        p.pos.copy(this.tmp.applyQuaternion(this.orientation).add(vessel.position))
+        const friction = Math.min(DECK_FRICTION * dt, 1)
+        p.prev.x += (p.pos.x - p.prev.x) * friction
+        p.prev.z += (p.pos.z - p.prev.z) * friction
+      }
+    }
+
     // skip & drag: submerged parts get pushed up and slowed sideways
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       if (i === HAND_L || i === HAND_R) {
@@ -231,6 +255,7 @@ export class Ragdoll {
 
     this.euler.set(-vessel.pitch, vessel.yaw, -vessel.roll)
     this.orientation.setFromEuler(this.euler)
+    this.invOrientation.copy(this.orientation).invert()
     this.mountL.copy(MOUNT_L).applyQuaternion(this.orientation).add(vessel.position)
     this.mountR.copy(MOUNT_R).applyQuaternion(this.orientation).add(vessel.position)
   }
