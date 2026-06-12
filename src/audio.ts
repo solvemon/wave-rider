@@ -7,7 +7,7 @@ export interface AudioTuning {
   music: number
 }
 
-export const defaultAudioTuning: AudioTuning = { master: 0.5, engine: 0.5, music: 0.4 }
+export const defaultAudioTuning: AudioTuning = { master: 0.5, engine: 0.5, music: 1 }
 
 const IDLE_RPM = 0.15
 const SPOOL_RATE = 4 // 1/s — how fast rpm chases its target
