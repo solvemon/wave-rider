@@ -70,10 +70,15 @@ const nitroFire = new NitroFire()
 scene.add(nitroFire.points)
 const nitroBar = new NitroBar(document.body)
 // the input's raw boost flag is gated through nitro.tick each physics step
-const gatedInput = { throttle: 0, steer: 0, boost: false }
+const gatedInput = { throttle: 0, steer: 0, boost: false, roll: 0 }
 
 const chase = new ChaseCamera(camera)
 const input = new KeyboardInput()
+
+if (import.meta.env.DEV) {
+  // dev-server-only handle for headless verification harnesses
+  ;(window as unknown as Record<string, unknown>).__waverider = { vessel, input, score, nitro, gatedInput }
+}
 input.attach()
 
 createTuningPanel({
@@ -129,6 +134,7 @@ function frame(now: number) {
     simTime += STEP
     gatedInput.throttle = input.state.throttle
     gatedInput.steer = input.state.steer
+    gatedInput.roll = input.state.roll ?? 0
     gatedInput.boost = nitro.tick(STEP, input.state.boost === true)
     frameBoosting = frameBoosting || gatedInput.boost
     vessel.update(STEP, gatedInput, sampler)
