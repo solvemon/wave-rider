@@ -36,6 +36,7 @@ export function createTuningPanel(targets: TuningTargets): GUI {
   physics.add(v, 'thrust', 2, 40, 0.5)
   physics.add(v, 'reverseThrust', 0, 20, 0.5)
   physics.add(v, 'waterDrag', 0.05, 2, 0.01)
+  physics.add(v, 'planingLift', 0, 1.5, 0.01)
   physics.add(v, 'lateralGrip', 0.2, 10, 0.1)
   physics.add(v, 'turnRate', 0.3, 4, 0.05)
   physics.add(v, 'steerIdleAuthority', 0, 1, 0.01)

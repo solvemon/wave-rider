@@ -15,6 +15,7 @@ export interface VesselTuning {
   thrust: number
   reverseThrust: number
   waterDrag: number
+  planingLift: number // upward accel per m/s of forward speed — speed lifts the hull out of the water
   lateralGrip: number // how fast sideways slip bleeds off (1/s) — lower = driftier carves
   turnRate: number // rad/s at full grip and full throttle
   steerIdleAuthority: number // 0..1 share of turnRate available with no throttle (bare rudder)
@@ -36,8 +37,9 @@ export const defaultTuning: VesselTuning = {
   thrust: 25,
   reverseThrust: 6,
   waterDrag: 0.5,
+  planingLift: 0.5,
   lateralGrip: 2.5,
-  turnRate: 1.8,
+  turnRate: 1.0,
   steerIdleAuthority: 0.25,
   bankFactor: 0.35,
   orientSpring: 18,
@@ -108,9 +110,6 @@ export class Vessel {
         this.vz *= t.speedKeptOnLanding
       }
 
-      const springAccel = Math.max(submersion, 0) * t.buoyancySpring
-      this.vy += (springAccel - t.buoyancyDamping * this.vy - t.gravity) * dt
-
       // Decompose velocity into the hull frame: thrust and drag act along the
       // keel while lateralGrip bleeds off sideways slip. The heading rotates
       // first and the velocity catches up — that lag is what makes turns
@@ -123,6 +122,14 @@ export class Vessel {
       this.vx = forwardSpeed * sinYaw + lateralSpeed * cosYaw
       this.vz = forwardSpeed * cosYaw - lateralSpeed * sinYaw
 
+      // Planing lift: the hull pushes itself out of the water with speed,
+      // so at pace the vessel skims wave tops instead of plowing into faces.
+      // Capped below gravity so lift alone can never make the boat fly.
+      const planing = Math.min(Math.abs(forwardSpeed) * t.planingLift, t.gravity * 0.85)
+
+      const springAccel = Math.max(submersion, 0) * t.buoyancySpring
+      this.vy += (springAccel + planing - t.buoyancyDamping * this.vy - t.gravity) * dt
+
       // Jetski steering: the nozzle only bites under throttle; the bare hull
       // keeps steerIdleAuthority worth of rudder. Screen-right is -X in this
       // frame, so a right turn (steer +1) decreases yaw.
@@ -130,7 +137,8 @@ export class Vessel {
       const authority = t.steerIdleAuthority + (1 - t.steerIdleAuthority) * Math.max(input.throttle, 0)
       this.yaw -= input.steer * t.turnRate * grip * authority * dt
 
-      const targetPitch = Math.atan2(hBow - hStern, HULL_HALF_LENGTH * 2)
+      // Planing boats trim bow-up; scales with how hard the hull is planing.
+      const targetPitch = Math.atan2(hBow - hStern, HULL_HALF_LENGTH * 2) + (planing / t.gravity) * 0.12
       const targetRoll = Math.atan2(hPort - hStarboard, HULL_HALF_WIDTH * 2) + input.steer * t.bankFactor * grip
       this.pitchVel += (t.orientSpring * (targetPitch - this.pitch) - t.orientDamping * this.pitchVel) * dt
       this.rollVel += (t.orientSpring * (targetRoll - this.roll) - t.orientDamping * this.rollVel) * dt

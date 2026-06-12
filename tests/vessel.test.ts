@@ -77,6 +77,16 @@ describe('Vessel', () => {
     expect(lateral).toBeLessThan(0.5)
   })
 
+  it('planes: rides higher in the water with speed', () => {
+    const vessel = new Vessel()
+    vessel.position.y = -0.3
+    run(vessel, 5) // settle at rest
+    const restingY = vessel.position.y
+    run(vessel, 6, { throttle: 1, steer: 0 })
+    expect(vessel.position.y).toBeGreaterThan(restingY + 0.15)
+    expect(vessel.position.y).toBeLessThan(0.2) // lift must never overcome gravity
+  })
+
   it('lands without exploding after a long drop', () => {
     const vessel = new Vessel()
     vessel.position.y = 6
