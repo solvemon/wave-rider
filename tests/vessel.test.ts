@@ -40,12 +40,41 @@ describe('Vessel', () => {
     expect(Math.abs(vessel.position.x)).toBeLessThan(0.001)
   })
 
-  it('turns toward steer input once moving', () => {
+  it('turns right under steer +1 (D) once moving', () => {
+    // Chase cam looks along +Z with Y up, so screen-right is -X: a right
+    // turn means yaw decreases and the vessel drifts toward negative X.
     const vessel = new Vessel()
     vessel.position.y = -0.3
-    run(vessel, 3, { throttle: 1, steer: 1 })
-    expect(vessel.yaw).toBeGreaterThan(0.1)
-    expect(vessel.position.x).toBeGreaterThan(1)
+    run(vessel, 1.5, { throttle: 1, steer: 1 })
+    expect(vessel.yaw).toBeLessThan(-0.1)
+    expect(vessel.position.x).toBeLessThan(-1)
+  })
+
+  it('steers much harder under throttle than while coasting', () => {
+    const buildMovingVessel = () => {
+      const vessel = new Vessel()
+      vessel.position.y = -0.3
+      run(vessel, 3, { throttle: 1, steer: 0 })
+      return vessel
+    }
+    const powered = buildMovingVessel()
+    run(powered, 1.5, { throttle: 1, steer: 1 })
+    const coasting = buildMovingVessel()
+    run(coasting, 1.5, { throttle: 0, steer: 1 })
+    expect(Math.abs(powered.yaw)).toBeGreaterThan(2 * Math.abs(coasting.yaw))
+    expect(Math.abs(coasting.yaw)).toBeGreaterThan(0.01) // rudder still does a little
+  })
+
+  it('carves: velocity realigns with the heading instead of railing on it', () => {
+    const vessel = new Vessel()
+    vessel.position.y = -0.3
+    vessel.vz = 10 // moving straight ahead (+Z)
+    vessel.yaw = 0.5 // heading suddenly points elsewhere
+    const initialLateral = Math.abs(vessel.vx * Math.cos(vessel.yaw) - vessel.vz * Math.sin(vessel.yaw))
+    expect(initialLateral).toBeGreaterThan(4)
+    run(vessel, 2)
+    const lateral = Math.abs(vessel.vx * Math.cos(vessel.yaw) - vessel.vz * Math.sin(vessel.yaw))
+    expect(lateral).toBeLessThan(0.5)
   })
 
   it('lands without exploding after a long drop', () => {

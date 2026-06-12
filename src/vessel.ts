@@ -15,7 +15,9 @@ export interface VesselTuning {
   thrust: number
   reverseThrust: number
   waterDrag: number
-  turnRate: number // rad/s at full grip
+  lateralGrip: number // how fast sideways slip bleeds off (1/s) — lower = driftier carves
+  turnRate: number // rad/s at full grip and full throttle
+  steerIdleAuthority: number // 0..1 share of turnRate available with no throttle (bare rudder)
   bankFactor: number // extra roll into turns
   orientSpring: number // how eagerly the hull follows the water surface
   orientDamping: number
@@ -31,10 +33,12 @@ export const defaultTuning: VesselTuning = {
   airGravity: 11,
   buoyancySpring: 60,
   buoyancyDamping: 8,
-  thrust: 14,
+  thrust: 25,
   reverseThrust: 6,
   waterDrag: 0.5,
-  turnRate: 1.6,
+  lateralGrip: 2.5,
+  turnRate: 1.8,
+  steerIdleAuthority: 0.25,
   bankFactor: 0.35,
   orientSpring: 18,
   orientDamping: 7,
@@ -52,8 +56,9 @@ const AIRBORNE_CLEAR = 0.02 // hysteresis: stay airborne until properly back in 
 
 export class Vessel {
   readonly position = new THREE.Vector3(0, 0, 0)
+  vx = 0 // horizontal velocity, world space
+  vz = 0
   vy = 0 // vertical velocity
-  speed = 0 // forward speed along heading
   yaw = 0
   pitch = 0 // nose-up positive
   roll = 0 // starboard-down positive
@@ -62,6 +67,11 @@ export class Vessel {
   airborne = false
 
   constructor(public tuning: VesselTuning = { ...defaultTuning }) {}
+
+  /** Signed speed along the heading — what the camera and tests care about. */
+  get speed(): number {
+    return this.vx * Math.sin(this.yaw) + this.vz * Math.cos(this.yaw)
+  }
 
   update(dt: number, input: VesselInput, sampleHeight: SurfaceSampler) {
 
@@ -94,16 +104,31 @@ export class Vessel {
         if (this.vy < 0) {
           this.vy *= 1 - t.landingAbsorb
         }
-        this.speed *= t.speedKeptOnLanding
+        this.vx *= t.speedKeptOnLanding
+        this.vz *= t.speedKeptOnLanding
       }
 
       const springAccel = Math.max(submersion, 0) * t.buoyancySpring
       this.vy += (springAccel - t.buoyancyDamping * this.vy - t.gravity) * dt
 
-      const grip = THREE.MathUtils.clamp(this.speed / 8, 0, 1)
+      // Decompose velocity into the hull frame: thrust and drag act along the
+      // keel while lateralGrip bleeds off sideways slip. The heading rotates
+      // first and the velocity catches up — that lag is what makes turns
+      // carve like a boat instead of pivoting like a spaceship.
+      let forwardSpeed = this.vx * sinYaw + this.vz * cosYaw
+      let lateralSpeed = this.vx * cosYaw - this.vz * sinYaw
       const throttleAccel = input.throttle >= 0 ? input.throttle * t.thrust : input.throttle * t.reverseThrust
-      this.speed += (throttleAccel - t.waterDrag * this.speed) * dt
-      this.yaw += input.steer * t.turnRate * grip * dt
+      forwardSpeed += (throttleAccel - t.waterDrag * forwardSpeed) * dt
+      lateralSpeed *= Math.max(0, 1 - t.lateralGrip * dt)
+      this.vx = forwardSpeed * sinYaw + lateralSpeed * cosYaw
+      this.vz = forwardSpeed * cosYaw - lateralSpeed * sinYaw
+
+      // Jetski steering: the nozzle only bites under throttle; the bare hull
+      // keeps steerIdleAuthority worth of rudder. Screen-right is -X in this
+      // frame, so a right turn (steer +1) decreases yaw.
+      const grip = THREE.MathUtils.clamp(Math.abs(forwardSpeed) / 8, 0, 1)
+      const authority = t.steerIdleAuthority + (1 - t.steerIdleAuthority) * Math.max(input.throttle, 0)
+      this.yaw -= input.steer * t.turnRate * grip * authority * dt
 
       const targetPitch = Math.atan2(hBow - hStern, HULL_HALF_LENGTH * 2)
       const targetRoll = Math.atan2(hPort - hStarboard, HULL_HALF_WIDTH * 2) + input.steer * t.bankFactor * grip
@@ -113,8 +138,8 @@ export class Vessel {
 
     this.pitch += this.pitchVel * dt
     this.roll += this.rollVel * dt
-    this.position.x += sinYaw * this.speed * dt
-    this.position.z += cosYaw * this.speed * dt
+    this.position.x += this.vx * dt
+    this.position.z += this.vz * dt
     this.position.y += this.vy * dt
   }
 }
@@ -140,9 +165,15 @@ export function createVesselMesh(): THREE.Group {
   return group
 }
 
+// Purely cosmetic lift so the hull reads as planing instead of burying in
+// steep wave faces (physics rides ~0.6 m below the local surface in big
+// swells). Does not affect any physics sampling.
+const VISUAL_FLOAT_OFFSET = 0.25
+
 export function syncVesselMesh(vessel: Vessel, mesh: THREE.Object3D) {
 
   mesh.position.copy(vessel.position)
+  mesh.position.y += VISUAL_FLOAT_OFFSET
   mesh.rotation.order = 'YXZ'
   mesh.rotation.y = vessel.yaw
   // Three's +X rotation tips local +Z (our bow) downward, hence the sign flips.
