@@ -4,6 +4,7 @@ import { Ocean } from './ocean'
 import { Vessel, KeyboardInput, createVesselMesh, syncVesselMesh } from './vessel'
 import { ChaseCamera } from './camera'
 import { Sky } from './sky'
+import { Wake } from './wake'
 import { createTuningPanel } from './tuning'
 
 const STEP = 1 / 60
@@ -39,6 +40,9 @@ scene.add(ocean.mesh)
 const vessel = new Vessel()
 const vesselMesh = createVesselMesh()
 scene.add(vesselMesh)
+
+const wake = new Wake()
+scene.add(wake.mesh)
 
 const chase = new ChaseCamera(camera)
 const input = new KeyboardInput()
@@ -77,6 +81,7 @@ function frame(now: number) {
 
   syncVesselMesh(vessel, vesselMesh)
   ocean.update(simTime, vessel.position)
+  wake.update(dt, simTime, vessel, sampler)
   chase.update(dt, vessel)
   sky.update(camera)
   renderer.render(scene, camera)
