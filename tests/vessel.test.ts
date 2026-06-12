@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { Vessel } from '../src/vessel'
+import { Vessel, VesselInput } from '../src/vessel'
 
 const STEP = 1 / 60
 const flatWater = () => 0
-const noInput = { throttle: 0, steer: 0 }
+const noInput: VesselInput = { throttle: 0, steer: 0 }
 
-function run(vessel: Vessel, seconds: number, input = noInput, sampler: (x: number, z: number) => number = flatWater) {
+function run(vessel: Vessel, seconds: number, input: VesselInput = noInput, sampler: (x: number, z: number) => number = flatWater) {
   const steps = Math.round(seconds / STEP)
   for (let i = 0; i < steps; i++) {
     vessel.update(STEP, input, sampler)
