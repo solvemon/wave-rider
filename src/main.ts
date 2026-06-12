@@ -8,6 +8,7 @@ import { Wake } from './wake'
 import { Splash } from './splash'
 import { Ragdoll } from './ragdoll'
 import { ScoreState, ScoreOverlay } from './score'
+import { NitroState, NitroFire, NitroBar } from './nitro'
 import { createTuningPanel } from './tuning'
 
 const STEP = 1 / 60
@@ -64,6 +65,13 @@ window.addEventListener('keydown', (e) => {
 const overlay = new ScoreOverlay(document.body)
 const scoreFx = { shake: 0.1 }
 
+const nitro = new NitroState()
+const nitroFire = new NitroFire()
+scene.add(nitroFire.points)
+const nitroBar = new NitroBar(document.body)
+// the input's raw boost flag is gated through nitro.tick each physics step
+const gatedInput = { throttle: 0, steer: 0, boost: false }
+
 const chase = new ChaseCamera(camera)
 const input = new KeyboardInput()
 input.attach()
@@ -84,6 +92,7 @@ createTuningPanel({
   scoreFx,
   vesselMesh: vesselMeshTuning,
   onVesselMeshChanged: applyVesselMeshTuning,
+  nitro: nitro.tuning,
 })
 
 ragdoll.reset(vessel)
@@ -114,9 +123,15 @@ function frame(now: number) {
   last = now
   accumulator += dt
 
+  let frameBoosting = false
+
   while (accumulator >= STEP) {
     simTime += STEP
-    vessel.update(STEP, input.state, sampler)
+    gatedInput.throttle = input.state.throttle
+    gatedInput.steer = input.state.steer
+    gatedInput.boost = nitro.tick(STEP, input.state.boost === true)
+    frameBoosting = frameBoosting || gatedInput.boost
+    vessel.update(STEP, gatedInput, sampler)
     ragdoll.update(STEP, vessel, sampler, splash)
     pendingLanding = Math.max(pendingLanding, vessel.justLanded)
     pendingTakeoff = pendingTakeoff || vessel.justTookOff
@@ -139,6 +154,8 @@ function frame(now: number) {
   ocean.update(simTime, vessel.position)
   wake.update(dt, simTime, vessel, sampler)
   splash.update(dt, vessel, pendingLanding, pendingTakeoff)
+  nitroFire.update(dt, vessel, frameBoosting)
+  nitroBar.set(nitro.charge)
   pendingLanding = 0
   pendingTakeoff = false
   chase.update(dt, vessel)
@@ -152,6 +169,9 @@ function frame(now: number) {
   pendingImpactForce = 0
 
   for (const bonus of score.drain()) {
+    if (bonus.big) {
+      nitro.addBonus(bonus.points)
+    }
     if (bonus.kind === 'snorkel') {
       popupWorld.copy(ragdoll.headPos)
     } else if (bonus.kind === 'airtime') {
@@ -165,7 +185,7 @@ function frame(now: number) {
       `${bonus.name} +${bonus.points}`,
       (popupProjected.x * 0.5 + 0.5) * window.innerWidth,
       (-popupProjected.y * 0.5 + 0.5) * window.innerHeight,
-      bonus.kind === 'megaSmack',
+      bonus.big,
     )
   }
   overlay.setTotal(score.total)

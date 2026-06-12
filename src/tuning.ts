@@ -7,6 +7,7 @@ import type { SplashTuning } from './splash'
 import type { RagdollTuning } from './ragdoll'
 import type { ScoreTuning } from './score'
 import type { VesselMeshTuning } from './vessel'
+import type { NitroTuning } from './nitro'
 
 export interface TuningTargets {
   waves: WaveParams[]
@@ -24,6 +25,7 @@ export interface TuningTargets {
   scoreFx: { shake: number }
   vesselMesh: VesselMeshTuning
   onVesselMeshChanged: () => void
+  nitro: NitroTuning
 }
 
 /** Builds the live tuning panel. Press H to show/hide. */
@@ -108,6 +110,12 @@ export function createTuningPanel(targets: TuningTargets): GUI {
   scoreFolder.add(targets.score, 'smackThreshold', 1, 8, 0.1)
   scoreFolder.add(targets.score, 'megaThreshold', 3, 15, 0.1)
   scoreFolder.add(targets.scoreFx, 'shake', 0, 0.2, 0.005).name('shakeScale')
+  scoreFolder.add(targets.score, 'bigThreshold', 50, 500, 5)
+
+  const nitroFolder = gui.addFolder('Nitro')
+  nitroFolder.add(targets.nitro, 'pointsToFull', 200, 2000, 10)
+  nitroFolder.add(targets.nitro, 'drainTime', 1, 6, 0.1)
+  nitroFolder.add(targets.vessel, 'boostThrust', 10, 60, 1)
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyH') {
