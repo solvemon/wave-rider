@@ -77,6 +77,32 @@ describe('Vessel', () => {
     expect(lateral).toBeLessThan(0.5)
   })
 
+  it('reports takeoff exactly on the transition step', () => {
+    const vessel = new Vessel()
+    vessel.update(STEP, noInput, () => -100)
+    expect(vessel.justTookOff).toBe(true)
+    vessel.update(STEP, noInput, () => -100)
+    expect(vessel.justTookOff).toBe(false)
+  })
+
+  it('reports landing impact speed on touchdown', () => {
+    const vessel = new Vessel()
+    vessel.position.y = 4
+    let firstImpact = 0
+    let impacts = 0
+    for (let i = 0; i < 600; i++) {
+      vessel.update(STEP, noInput, flatWater)
+      if (vessel.justLanded > 0) {
+        impacts++
+        if (firstImpact === 0) {
+          firstImpact = vessel.justLanded
+        }
+      }
+    }
+    expect(impacts).toBeGreaterThanOrEqual(1)
+    expect(firstImpact).toBeGreaterThan(3) // ~4 m fall at airGravity 11 → ≈9 m/s
+  })
+
   it('planes: rides higher in the water with speed', () => {
     const vessel = new Vessel()
     vessel.position.y = -0.3

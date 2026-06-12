@@ -67,6 +67,8 @@ export class Vessel {
   pitchVel = 0
   rollVel = 0
   airborne = false
+  justTookOff = false // true only on the step the hull left the water
+  justLanded = 0 // downward impact speed (m/s) on the touchdown step, else 0
 
   constructor(public tuning: VesselTuning = { ...defaultTuning }) {}
 
@@ -76,6 +78,9 @@ export class Vessel {
   }
 
   update(dt: number, input: VesselInput, sampleHeight: SurfaceSampler) {
+
+    this.justTookOff = false
+    this.justLanded = 0
 
     const t = this.tuning
     const sinYaw = Math.sin(this.yaw)
@@ -94,6 +99,9 @@ export class Vessel {
     // crests). Hysteresis keeps chop from flickering the airborne state,
     // which would bleed speed through repeated micro-landings.
     this.airborne = submersion < (wasAirborne ? AIRBORNE_CLEAR : AIRBORNE_THRESHOLD)
+    if (this.airborne && !wasAirborne) {
+      this.justTookOff = true
+    }
 
     if (this.airborne) {
       this.vy -= t.airGravity * dt
@@ -103,6 +111,7 @@ export class Vessel {
       this.rollVel += (t.autoLevelSpring * -this.roll - t.autoLevelDamping * this.rollVel) * dt
     } else {
       if (wasAirborne) {
+        this.justLanded = Math.max(0, -this.vy)
         if (this.vy < 0) {
           this.vy *= 1 - t.landingAbsorb
         }
