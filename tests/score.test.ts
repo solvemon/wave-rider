@@ -92,6 +92,18 @@ describe('ScoreState', () => {
     expect(score.drain()).toHaveLength(1)
   })
 
+  it('escalates barrel roll points within one flight and resets on landing', () => {
+    const score = new ScoreState(() => 0)
+    score.barrelRoll()
+    score.barrelRoll()
+    score.landed()
+    score.barrelRoll()
+    const rolls = score.drain().filter((b) => b.kind === 'barrelRoll')
+    expect(rolls.map((b) => b.points)).toEqual([200, 300, 200])
+    expect(rolls[0].name).toBe('BARREL ROLL')
+    expect(rolls[0].big).toBe(true) // rolls feed nitro
+  })
+
   it('ignores smacks during the suppression window after a reset', () => {
     const score = new ScoreState(() => 0)
     flyAndLand(score, 1)

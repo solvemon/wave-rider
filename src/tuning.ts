@@ -65,6 +65,7 @@ export function createTuningPanel(targets: TuningTargets): GUI {
   const air = gui.addFolder('Air')
   air.add(v, 'airGravity', 2, 30, 0.5)
   air.add(v, 'airPitchAuthority', 0, 1, 0.01)
+  air.add(v, 'rollRate', 1, 10, 0.1)
   air.add(v, 'autoLevelSpring', 0, 30, 0.5)
   air.add(v, 'autoLevelDamping', 0, 15, 0.1)
   air.add(v, 'landingAbsorb', 0, 1, 0.01)
@@ -111,6 +112,7 @@ export function createTuningPanel(targets: TuningTargets): GUI {
   scoreFolder.add(targets.score, 'megaThreshold', 3, 15, 0.1)
   scoreFolder.add(targets.scoreFx, 'shake', 0, 0.2, 0.005).name('shakeScale')
   scoreFolder.add(targets.score, 'bigThreshold', 50, 500, 5)
+  scoreFolder.add(targets.score, 'rollPoints', 50, 500, 10)
 
   const nitroFolder = gui.addFolder('Nitro')
   nitroFolder.add(targets.nitro, 'pointsToFull', 200, 2000, 10)

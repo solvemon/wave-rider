@@ -140,6 +140,9 @@ function frame(now: number) {
     if (vessel.justLanded > 0) {
       score.landed()
     }
+    if (vessel.justBarrelRolled) {
+      score.barrelRoll()
+    }
     if (ragdoll.deckImpact) {
       score.deckImpact(ragdoll.deckImpact.force, ragdoll.deckImpact.head)
       if (ragdoll.deckImpact.force > pendingImpactForce) {
@@ -174,7 +177,7 @@ function frame(now: number) {
     }
     if (bonus.kind === 'snorkel') {
       popupWorld.copy(ragdoll.headPos)
-    } else if (bonus.kind === 'airtime') {
+    } else if (bonus.kind === 'airtime' || bonus.kind === 'barrelRoll') {
       popupWorld.copy(vessel.position)
     } else {
       popupWorld.copy(lastImpactPoint)

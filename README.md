@@ -21,6 +21,8 @@ type-checks and bundles.
 | W / ↑ | Throttle (nose-up in the air) |
 | S / ↓ | Reverse / brake (nose-down in the air) |
 | A / D | Steer |
+| Q / E | Barrel roll (airborne) |
+| Space | Nitro boost (earned from big bonuses) |
 | H | Show/hide the tuning panel |
 | R | Reset the ragdoll rider onto the deck |
 

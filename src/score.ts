@@ -1,4 +1,4 @@
-export type BonusKind = 'airtime' | 'snorkel' | 'smack' | 'headSmack' | 'megaSmack'
+export type BonusKind = 'airtime' | 'snorkel' | 'smack' | 'headSmack' | 'megaSmack' | 'barrelRoll'
 
 export interface Bonus {
   kind: BonusKind
@@ -14,6 +14,7 @@ const NAME_POOLS: Record<BonusKind, string[]> = {
   smack: ['DECK SMACK', 'HULL INSPECTION', 'BONK'],
   headSmack: ['FACE CHECK', "CAPTAIN'S INSPECTION", 'FACE BONK'],
   megaSmack: ['MEGA SMACK', 'INSURANCE CLAIM', 'MEGA BONK'],
+  barrelRoll: ['BARREL ROLL', 'CAPSIZE AVERTED', 'SPIN2WIN'],
 }
 
 export interface ScoreTuning {
@@ -26,6 +27,7 @@ export interface ScoreTuning {
   smackThreshold: number // m/s into the deck before a hit counts
   megaThreshold: number
   bigThreshold: number // points at which a bonus turns yellow and feeds nitro
+  rollPoints: number // base points per barrel roll; +100 per extra roll in one flight
 }
 
 // Calibrated from playtesting: routine wave-chop bouncing peaks around
@@ -41,6 +43,7 @@ export const defaultScoreTuning: ScoreTuning = {
   smackThreshold: 7,
   megaThreshold: 10,
   bigThreshold: 150,
+  rollPoints: 200,
 }
 
 const MIN_AIR_SECONDS = 0.5
@@ -58,6 +61,7 @@ export class ScoreState {
   private smackCooldown = 0
   private suppressTimer = 0
   private smackWindow = 0
+  private rollChain = 0
   private readonly queue: Bonus[] = []
 
   constructor(private readonly random: () => number = Math.random) {}
@@ -105,6 +109,13 @@ export class ScoreState {
       this.smackWindow = SMACK_WINDOW
     }
     this.airSeconds = 0
+    this.rollChain = 0
+  }
+
+  /** A completed mid-air barrel roll — chains within one flight. */
+  barrelRoll() {
+    this.rollChain++
+    this.award('barrelRoll', this.tuning.rollPoints + (this.rollChain - 1) * 100)
   }
 
   deckImpact(force: number, head: boolean) {
